@@ -48,11 +48,11 @@
             <version>8.0.33</version>
             <scope>runtime</scope>
         </dependency>
-        <!-- springdoc-openapi（注意：2.x只支持Spring Boot 3.x，这里用1.7.0） -->
+        <!-- springdoc-openapi for Spring Boot 2.x -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-ui</artifactId>
-            <version>1.7.0</version>
+            <version>1.8.0</version>
         </dependency>
         <!-- 测试依赖 -->
         <dependency>
