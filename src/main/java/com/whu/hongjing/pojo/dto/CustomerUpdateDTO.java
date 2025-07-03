@@ -8,11 +8,15 @@ import javax.validation.constraints.NotNull;
 import java.time.LocalDate;
 
 /**
- * 客户新增 DTO
+ * 客户更新 DTO
  */
 @Data
-@Schema(description = "客户新增请求对象")
-public class CustomerDTO {
+@Schema(description = "客户更新请求对象")
+public class CustomerUpdateDTO {
+
+    @NotNull(message = "客户ID不能为空")
+    @Schema(description = "客户ID", example = "1")
+    private Long id;
 
     @NotBlank(message = "姓名不能为空")
     @Schema(description = "姓名", example = "张三")

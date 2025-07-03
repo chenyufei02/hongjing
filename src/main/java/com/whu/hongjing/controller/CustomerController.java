@@ -1,15 +1,20 @@
 package com.whu.hongjing.controller;
 
+//http://localhost:8080/v3/api-docs
 import com.whu.hongjing.pojo.dto.CustomerDTO;
+import com.whu.hongjing.pojo.dto.CustomerUpdateDTO;
 import com.whu.hongjing.pojo.entity.Customer;
+import com.whu.hongjing.pojo.vo.CustomerVO;
 import com.whu.hongjing.service.CustomerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 客户管理接口
@@ -24,7 +29,7 @@ public class CustomerController {
 
     @Operation(summary = "新增客户")
     @PostMapping("/add")
-    public boolean add(@RequestBody CustomerDTO dto) {
+    public boolean add(@RequestBody @Validated CustomerDTO dto) {
         Customer customer = new Customer();
         BeanUtils.copyProperties(dto, customer);
         return customerService.save(customer);
@@ -39,19 +44,32 @@ public class CustomerController {
 
     @Operation(summary = "更新客户信息")
     @PutMapping("/update")
-    public boolean updateCustomer(@RequestBody Customer customer) {
+    public boolean updateCustomer(@RequestBody @Validated CustomerUpdateDTO dto) {
+        Customer customer = new Customer();
+        BeanUtils.copyProperties(dto, customer);
         return customerService.updateCustomer(customer);
     }
 
     @Operation(summary = "根据ID查询客户")
     @GetMapping("/{id}")
-    public Customer getCustomerById(@PathVariable Long id) {
-        return customerService.getCustomerById(id);
+    public CustomerVO getCustomerById(@PathVariable Long id) {
+        Customer customer = customerService.getCustomerById(id);
+        if (customer == null) {
+            return null;
+        }
+        CustomerVO vo = new CustomerVO();
+        BeanUtils.copyProperties(customer, vo);
+        return vo;
     }
 
     @Operation(summary = "获取所有客户列表")
     @GetMapping("/list")
-    public List<Customer> getCustomerList() {
-        return customerService.getAllCustomers();
+    public List<CustomerVO> getCustomerList() {
+        List<Customer> customerList = customerService.getAllCustomers();
+        return customerList.stream().map(customer -> {
+            CustomerVO vo = new CustomerVO();
+            BeanUtils.copyProperties(customer, vo);
+            return vo;
+        }).collect(Collectors.toList());
     }
 }
