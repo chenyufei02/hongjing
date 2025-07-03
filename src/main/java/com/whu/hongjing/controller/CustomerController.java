@@ -1,6 +1,6 @@
 package com.whu.hongjing.controller;
 
-import com.whu.hongjing.pojo.dto.CustomerAddDTO;
+import com.whu.hongjing.pojo.dto.CustomerDTO;
 import com.whu.hongjing.pojo.entity.Customer;
 import com.whu.hongjing.service.CustomerService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,7 +24,7 @@ public class CustomerController {
 
     @Operation(summary = "新增客户")
     @PostMapping("/add")
-    public boolean add(@RequestBody CustomerAddDTO dto) {
+    public boolean add(@RequestBody CustomerDTO dto) {
         Customer customer = new Customer();
         BeanUtils.copyProperties(dto, customer);
         return customerService.save(customer);

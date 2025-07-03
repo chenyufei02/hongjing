@@ -10,7 +10,7 @@ import java.time.LocalDate;
  */
 @Data
 @Schema(description = "客户新增请求对象")
-public class CustomerAddDTO {
+public class CustomerDTO {
 
     @Schema(description = "姓名", required = true, example = "张三")
     private String name;
