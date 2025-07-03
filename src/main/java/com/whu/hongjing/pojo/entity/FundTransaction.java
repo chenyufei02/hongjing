@@ -18,11 +18,11 @@ public class FundTransaction {
 
     private String transactionType;
 
-    private BigDecimal transactionAmount;
+    private BigDecimal transactionAmount; // 交易金额
 
-    private BigDecimal transactionShares;
+    private BigDecimal transactionShares;  // 交易份额
 
-    private BigDecimal sharePrice;
+    private BigDecimal sharePrice;       // 成交净值
 
     private LocalDateTime transactionTime;
 

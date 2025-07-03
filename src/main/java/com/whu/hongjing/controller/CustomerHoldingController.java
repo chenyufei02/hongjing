@@ -1,0 +1,32 @@
+package com.whu.hongjing.controller;
+
+import com.whu.hongjing.pojo.entity.CustomerHolding;
+import com.whu.hongjing.service.CustomerHoldingService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/customer-holding")
+@Tag(name = "客户持仓管理", description = "提供客户持仓的查询接口")
+public class CustomerHoldingController {
+
+    // TODO 还需要处理交易发生后自动更新持仓信息
+    @Autowired
+    private CustomerHoldingService customerHoldingService;
+
+    @Operation(summary = "根据客户ID查询其所有持仓信息")
+    @GetMapping("/customer/{customerId}")
+    public List<CustomerHolding> getHoldingsByCustomerId(@PathVariable Long customerId) {
+        return customerHoldingService.listByCustomerId(customerId);
+    }
+
+    @Operation(summary = "【手动触发】为单个客户重新计算历史持仓")
+    @PostMapping("/recalculate/{customerId}")
+    public boolean recalculateHoldings(@PathVariable Long customerId) {
+        return customerHoldingService.recalculateAndSaveHoldings(customerId);
+    }
+}
