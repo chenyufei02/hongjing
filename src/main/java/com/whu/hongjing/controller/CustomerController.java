@@ -1,44 +1,57 @@
 package com.whu.hongjing.controller;
 
-import com.whu.hongjing.service.CustomerService;
+import com.whu.hongjing.pojo.dto.CustomerAddDTO;
 import com.whu.hongjing.pojo.entity.Customer;
+import com.whu.hongjing.service.CustomerService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /**
- * 客户信息管理控制器
+ * 客户管理接口
  */
 @RestController
 @RequestMapping("/customer")
+@Tag(name = "客户管理", description = "客户相关增删改查接口")
 public class CustomerController {
 
     @Autowired
     private CustomerService customerService;
 
-    @Operation(summary = "获取所有客户列表")
-    @GetMapping("/list")
-    public List<Customer> listAll() {
-        return customerService.list();
-    }
-
     @Operation(summary = "新增客户")
     @PostMapping("/add")
-    public boolean add(@RequestBody Customer customer) {
+    public boolean add(@RequestBody CustomerAddDTO dto) {
+        Customer customer = new Customer();
+        BeanUtils.copyProperties(dto, customer);
         return customerService.save(customer);
     }
 
-    @Operation(summary = "删除客户")
+
+    @Operation(summary = "根据ID删除客户")
     @DeleteMapping("/delete/{id}")
-    public boolean delete(@PathVariable Long id) {
-        return customerService.removeById(id);
+    public boolean deleteCustomer(@PathVariable Long id) {
+        return customerService.removeCustomer(id);
     }
 
-    @Operation(summary = "根据ID更新客户")
+    @Operation(summary = "更新客户信息")
     @PutMapping("/update")
-    public boolean update(@RequestBody Customer customer) {
-        return customerService.updateById(customer);
+    public boolean updateCustomer(@RequestBody Customer customer) {
+        return customerService.updateCustomer(customer);
+    }
+
+    @Operation(summary = "根据ID查询客户")
+    @GetMapping("/{id}")
+    public Customer getCustomerById(@PathVariable Long id) {
+        return customerService.getCustomerById(id);
+    }
+
+    @Operation(summary = "获取所有客户列表")
+    @GetMapping("/list")
+    public List<Customer> getCustomerList() {
+        return customerService.getAllCustomers();
     }
 }

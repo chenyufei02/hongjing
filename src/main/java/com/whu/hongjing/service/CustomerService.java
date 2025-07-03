@@ -1,11 +1,13 @@
 package com.whu.hongjing.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.whu.hongjing.pojo.entity.Customer;
+import java.util.List;
 
-/**
- * 客户信息服务接口
- */
-public interface CustomerService extends IService<Customer> {
-    // 如果有自定义业务方法可以在这里加
+public interface CustomerService {
+    boolean removeCustomer(Long id);
+    boolean updateCustomer(Customer customer);
+    Customer getCustomerById(Long id);
+    List<Customer> getAllCustomers();
+
+    boolean save(Customer customer);
 }
