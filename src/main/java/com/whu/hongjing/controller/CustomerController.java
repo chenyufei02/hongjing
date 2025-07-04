@@ -12,7 +12,8 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
+import com.whu.hongjing.pojo.vo.CustomerTagVO;
+import com.whu.hongjing.service.CustomerTagService;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,6 +25,8 @@ import java.util.stream.Collectors;
 @Tag(name = "客户管理", description = "客户相关增删改查接口")
 public class CustomerController {
 
+    @Autowired
+    private CustomerTagService customerTagService; // 注入标签服务
     @Autowired
     private CustomerService customerService;
 
@@ -95,5 +98,11 @@ public class CustomerController {
             BeanUtils.copyProperties(customer, vo);
             return vo;
         }).collect(Collectors.toList());
+    }
+
+    @Operation(summary = "根据客户ID获取其画像标签")
+    @GetMapping("/{id}/tags")
+    public List<CustomerTagVO> getCustomerTags(@PathVariable Long id) {
+        return customerTagService.getTagsByCustomerId(id);
     }
 }
