@@ -19,4 +19,6 @@ public interface CustomerService {
 
     // 根据姓名查询客户列表的接口方法
     List<Customer> getCustomersByName(String name);
+
+    List<Customer> getCustomersByTag(String tagName);
 }

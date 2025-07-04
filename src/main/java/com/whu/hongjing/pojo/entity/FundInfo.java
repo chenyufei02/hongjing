@@ -15,6 +15,8 @@ public class FundInfo {
 
     private String fundType;
 
+    private Integer riskScore;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 

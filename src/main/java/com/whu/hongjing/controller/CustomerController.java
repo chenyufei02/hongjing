@@ -105,4 +105,16 @@ public class CustomerController {
     public List<CustomerTagVO> getCustomerTags(@PathVariable Long id) {
         return customerTagService.getTagsByCustomerId(id);
     }
+
+    @Operation(summary = "根据标签筛选客户列表")
+    @GetMapping("/by-tag")
+    public List<CustomerVO> listCustomersByTag(@RequestParam String tagName) {
+        List<Customer> customers = customerService.getCustomersByTag(tagName);
+        // 将 List<Customer> 转换为 List<CustomerVO>
+        return customers.stream().map(customer -> {
+            CustomerVO vo = new CustomerVO();
+            BeanUtils.copyProperties(customer, vo);
+            return vo;
+        }).collect(Collectors.toList());
+    }
 }

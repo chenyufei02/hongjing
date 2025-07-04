@@ -2,6 +2,7 @@ package com.whu.hongjing.controller;
 
 import com.whu.hongjing.pojo.dto.FundInfoDTO;
 import com.whu.hongjing.pojo.entity.FundInfo;
+import com.whu.hongjing.pojo.vo.ApiResponseVO;
 import com.whu.hongjing.service.FundInfoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -9,6 +10,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import com.whu.hongjing.service.FundDataImportService;
 
 import java.util.List;
 
@@ -19,6 +21,9 @@ public class FundInfoController {
 
     @Autowired
     private FundInfoService fundInfoService;
+
+    @Autowired
+    private FundDataImportService fundDataImportService; // 注入新的导入服务
 
     @Operation(summary = "新增基金信息")
     @PostMapping("/add")
@@ -52,5 +57,17 @@ public class FundInfoController {
     @GetMapping("/list")
     public List<FundInfo> listAllFundInfo() {
         return fundInfoService.list();
+    }
+
+    @PostMapping("/import-all")
+    @Operation(summary = "【手动触发】从外部数据源导入所有公募基金数据")
+    public ApiResponseVO importAllFunds() { // <-- 修改返回类型
+        try {
+            int count = fundDataImportService.importFundsFromDataSource();
+            return new ApiResponseVO(true, "数据导入任务完成！共处理了 " + count + " 只基金。");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ApiResponseVO(false, "数据导入失败: " + e.getMessage());
+        }
     }
 }
