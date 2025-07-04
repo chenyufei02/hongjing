@@ -45,7 +45,7 @@ public class CustomerHolding {
     private BigDecimal averageCost;
 
     /**
-     * 持仓最后更新日期。记录这条持仓信息最近一次因为交易而发生变化的时间。
+     * 持仓最后更新日期。记录这条持仓信息最近一次因为交易而发生变化的时间。是最新一次交易完成的时间
      */
     private LocalDateTime lastUpdateDate;
 
@@ -56,7 +56,7 @@ public class CustomerHolding {
     private LocalDateTime createTime;
 
     /**
-     * 记录更新时间，由MyBatis-Plus在插入或更新时自动填充。
+     * 记录更新时间，由MyBatis-Plus在插入或更新时自动填充。是在系统里更新的时间
      */
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;

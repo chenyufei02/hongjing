@@ -62,6 +62,30 @@ public class CustomerController {
         return vo;
     }
 
+    @Operation(summary = "根据身份证号码查询客户")
+    @GetMapping("/search") // 我们使用 /search 路径
+    public CustomerVO getCustomerByIdNumber(@RequestParam String idNumber) {
+        Customer customer = customerService.getCustomerByIdNumber(idNumber);
+        if (customer == null) {
+            return null;
+        }
+        CustomerVO vo = new CustomerVO();
+        BeanUtils.copyProperties(customer, vo);
+        return vo;
+    }
+
+    @Operation(summary = "根据姓名查询客户列表（支持重名）")
+    @GetMapping("/search-by-name") // 使用新路径 /search-by-name
+    public List<CustomerVO> getCustomersByName(@RequestParam String name) {
+        List<Customer> customers = customerService.getCustomersByName(name);
+        // 使用Stream API将List<Customer>转换为List<CustomerVO>
+        return customers.stream().map(customer -> {
+            CustomerVO vo = new CustomerVO();
+            BeanUtils.copyProperties(customer, vo);
+            return vo;
+        }).collect(Collectors.toList());
+    }
+
     @Operation(summary = "获取所有客户列表")
     @GetMapping("/list")
     public List<CustomerVO> getCustomerList() {

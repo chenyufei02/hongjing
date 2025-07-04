@@ -6,6 +6,7 @@ import com.whu.hongjing.pojo.entity.Customer;
 import com.whu.hongjing.service.CustomerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 
 import java.util.List;
 
@@ -29,6 +30,20 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     @Override
     public Customer getCustomerById(Long id) {
         return customerMapper.selectById(id);
+    }
+
+    @Override
+    public Customer getCustomerByIdNumber(String idNumber) {
+        QueryWrapper<Customer> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("id_number", idNumber);
+        return this.getOne(queryWrapper); // getOne确保只返回一条记录
+    }
+
+    @Override
+    public List<Customer> getCustomersByName(String name) {
+        QueryWrapper<Customer> queryWrapper = new QueryWrapper<>();
+        queryWrapper.like("name", name);
+        return this.list(queryWrapper); // list会返回所有匹配的记录
     }
 
     @Override

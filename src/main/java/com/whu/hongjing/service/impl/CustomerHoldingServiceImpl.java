@@ -24,6 +24,13 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
     @Autowired
     private FundTransactionService fundTransactionService;
 
+    /**
+     * 根据ID查询持仓情况
+     * @param customerId
+     * @return java.util.List<com.whu.hongjing.pojo.entity.CustomerHolding>
+     * @author yufei
+     * @since 2025/7/4
+     */
     @Override
     public List<CustomerHolding> listByCustomerId(Long customerId) {
         QueryWrapper<CustomerHolding> queryWrapper = new QueryWrapper<>();
@@ -112,5 +119,46 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
             }
         }
         return true;
+    }
+
+    @Override
+    @Transactional
+    public void updateHoldingAfterNewTransaction(FundTransaction transaction) {
+        // 1. 查找该客户对该基金是否已有持仓记录
+        QueryWrapper<CustomerHolding> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("customer_id", transaction.getCustomerId())
+                    .eq("fund_code", transaction.getFundCode());
+        CustomerHolding holding = this.getOne(queryWrapper);
+
+        if (holding == null) { // 如果没有持仓记录，说明是首次购买
+            holding = new CustomerHolding();
+            holding.setCustomerId(transaction.getCustomerId());
+            holding.setFundCode(transaction.getFundCode());
+            holding.setTotalShares(BigDecimal.ZERO);
+            holding.setAverageCost(BigDecimal.ZERO);
+        }
+
+        // 2. 根据交易类型，更新份额和成本
+        if ("申购".equals(transaction.getTransactionType())) {
+            // 新总份额 = 原份额 + 新交易份额
+            BigDecimal newTotalShares = holding.getTotalShares().add(transaction.getTransactionShares());
+            // 新总成本 = (原成本*原份额 + 新交易金额)
+            BigDecimal newTotalCost = (holding.getAverageCost().multiply(holding.getTotalShares()))
+                                        .add(transaction.getTransactionAmount());
+
+            holding.setTotalShares(newTotalShares);
+            // 新平均成本 = 新总成本/新总份额
+            holding.setAverageCost(newTotalCost.divide(newTotalShares, 4, RoundingMode.HALF_UP));
+
+        } else if ("赎回".equals(transaction.getTransactionType())) {
+            // 赎回不影响平均成本，所以不做处理。只对总份额做处理
+            BigDecimal newTotalShares = holding.getTotalShares().subtract(transaction.getTransactionShares());
+            holding.setTotalShares(newTotalShares);
+        }
+
+        holding.setLastUpdateDate(LocalDateTime.now());
+
+        // 3. 保存或更新持仓记录到数据库
+        this.saveOrUpdate(holding);
     }
 }

@@ -1,12 +1,14 @@
 package com.whu.hongjing.controller;
 
+import com.whu.hongjing.pojo.dto.FundPurchaseDTO; // <-- 导入新的DTO
+import com.whu.hongjing.pojo.dto.FundRedeemDTO;   // <-- 导入新的DTO
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.whu.hongjing.pojo.dto.FundTransactionDTO;
+//import com.whu.hongjing.pojo.dto.FundTransactionDTO;
 import com.whu.hongjing.pojo.entity.FundTransaction;
 import com.whu.hongjing.service.FundTransactionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.BeanUtils;
+//import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -21,12 +23,24 @@ public class FundTransactionController {
     @Autowired
     private FundTransactionService fundTransactionService;
 
-    @Operation(summary = "新增一条基金交易记录")
-    @PostMapping("/add")
-    public boolean addTransaction(@RequestBody @Validated FundTransactionDTO dto) {
-        FundTransaction transaction = new FundTransaction();
-        BeanUtils.copyProperties(dto, transaction);
-        return fundTransactionService.save(transaction);
+//    @Operation(summary = "新增一条基金交易记录")
+//    @PostMapping("/add")
+//    public FundTransaction addTransaction(@RequestBody @Validated FundTransactionDTO dto) {
+//        FundTransaction transaction = new FundTransaction();
+//        BeanUtils.copyProperties(dto, transaction);
+//        return fundTransactionService.createTransactionAndUpdateHolding(dto);
+//    }
+
+    @Operation(summary = "申购基金")
+    @PostMapping("/purchase")
+    public FundTransaction purchase(@RequestBody @Validated FundPurchaseDTO dto) {
+        return fundTransactionService.createPurchaseTransaction(dto);
+    }
+
+    @Operation(summary = "赎回基金")
+    @PostMapping("/redeem")
+    public FundTransaction redeem(@RequestBody @Validated FundRedeemDTO dto) {
+        return fundTransactionService.createRedeemTransaction(dto);
     }
 
     @Operation(summary = "根据客户ID查询其所有交易记录")

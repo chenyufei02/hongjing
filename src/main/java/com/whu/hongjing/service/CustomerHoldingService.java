@@ -2,6 +2,8 @@ package com.whu.hongjing.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.whu.hongjing.pojo.entity.CustomerHolding;
+import com.whu.hongjing.pojo.entity.FundTransaction;
+
 import java.util.List;
 
 public interface CustomerHoldingService extends IService<CustomerHolding> {
@@ -11,4 +13,7 @@ public interface CustomerHoldingService extends IService<CustomerHolding> {
 
     // 新增：为单个客户重新计算并更新所有持仓的方法
     boolean recalculateAndSaveHoldings(Long customerId);
+
+    // 新增：处理一笔新交易并更新持仓
+    void updateHoldingAfterNewTransaction(FundTransaction transaction);
 }
