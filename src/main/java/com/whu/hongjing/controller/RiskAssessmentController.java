@@ -1,12 +1,11 @@
 package com.whu.hongjing.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.whu.hongjing.pojo.dto.RiskAssessmentDTO;
+import com.whu.hongjing.pojo.dto.RiskAssessmentSubmitDTO; // 1. 导入新的DTO
 import com.whu.hongjing.pojo.entity.RiskAssessment;
 import com.whu.hongjing.service.RiskAssessmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -15,7 +14,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/risk-assessment")
-@Tag(name = "客户风险评估管理", description = "提供客户风险评估的增删改查接口")
+@Tag(name = "客户风险评估管理", description = "提供客户风险评估的记录和查询接口")
 public class RiskAssessmentController {
 
     @Autowired
@@ -23,23 +22,22 @@ public class RiskAssessmentController {
 
     @Operation(summary = "新增一条客户风险评估记录")
     @PostMapping("/add")
-    public boolean addAssessment(@RequestBody @Validated RiskAssessmentDTO dto) {
-        RiskAssessment assessment = new RiskAssessment();
-        BeanUtils.copyProperties(dto, assessment);
-        return riskAssessmentService.save(assessment);
+    // 2. 方法的参数，只接收分数的 DTO
+    public RiskAssessment addAssessment(@RequestBody @Validated RiskAssessmentSubmitDTO dto) {
+        // 3. 调用 Service 层中的 createAssessment 方法根据分数dto计算风险等级并封装进RiskAssessment对象进行创建
+        return riskAssessmentService.createAssessment(dto);
     }
 
     @Operation(summary = "根据客户ID查询其所有风险评估记录")
     @GetMapping("/customer/{customerId}")
     public List<RiskAssessment> listByCustomerId(@PathVariable Long customerId) {
-        // 使用QueryWrapper来构建查询条件
         QueryWrapper<RiskAssessment> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("customer_id", customerId);
-        queryWrapper.orderByDesc("assessment_date"); // 按评估日期降序排序，最新的在前
+        queryWrapper.orderByDesc("assessment_date");
         return riskAssessmentService.list(queryWrapper);
     }
 
-    @Operation(summary = "根据主键ID删除评估记录(通常不使用)")
+    @Operation(summary = "根据主键ID删除评估记录")
     @DeleteMapping("/delete/{id}")
     public boolean deleteAssessment(@PathVariable Long id) {
         return riskAssessmentService.removeById(id);

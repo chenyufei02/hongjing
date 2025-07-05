@@ -4,25 +4,30 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.whu.hongjing.mapper.CustomerHoldingMapper;
 import com.whu.hongjing.pojo.entity.CustomerHolding;
+import com.whu.hongjing.pojo.entity.FundInfo;
 import com.whu.hongjing.pojo.entity.FundTransaction;
 import com.whu.hongjing.service.CustomerHoldingService;
 import com.whu.hongjing.service.FundTransactionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.whu.hongjing.pojo.entity.FundInfo; // 导入
+import com.whu.hongjing.service.FundInfoService; // 导入
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMapper, CustomerHolding> implements CustomerHoldingService {
 
     @Autowired
     private FundTransactionService fundTransactionService;
+
+    @Autowired
+    private FundInfoService fundInfoService;
 
     /**
      * 根据ID查询持仓情况
@@ -160,5 +165,49 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
 
         // 3. 保存或更新持仓记录到数据库
         this.saveOrUpdate(holding);
+    }
+
+    @Override
+    public BigDecimal getHoldingShares(Long customerId, String fundCode) {
+        QueryWrapper<CustomerHolding> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("customer_id", customerId)
+                    .eq("fund_code", fundCode);
+
+        CustomerHolding holding = this.getOne(queryWrapper);
+
+        if (holding != null && holding.getTotalShares() != null) {
+            return holding.getTotalShares();
+        }
+
+        return BigDecimal.ZERO; // 如果找不到持仓记录，或份额为空，则返回0
+    }
+
+    @Override
+    @Transactional
+    public void recalculateAllMarketValues() {
+        // 1. 一次性获取所有基金的净值
+        Map<String, BigDecimal> fundPriceMap = fundInfoService.list().stream()
+                .filter(fund -> fund.getNetValue() != null)
+                .collect(Collectors.toMap(FundInfo::getFundCode, FundInfo::getNetValue));
+
+        // 2. 一次性获取所有持仓记录
+        List<CustomerHolding> allHoldings = this.list();
+        if (allHoldings.isEmpty()) {
+            return;
+        }
+
+        // 3. 遍历并更新市值
+        for (CustomerHolding holding : allHoldings) {
+            BigDecimal latestNetValue = fundPriceMap.get(holding.getFundCode());
+            if (latestNetValue != null && holding.getTotalShares() != null) {
+                BigDecimal newMarketValue = holding.getTotalShares().multiply(latestNetValue)
+                                                    .setScale(2, RoundingMode.HALF_UP);
+                holding.setMarketValue(newMarketValue);
+            }
+        }
+
+        // 4. 将更新后的所有持仓数据，批量写回数据库
+        this.updateBatchById(allHoldings);
+        System.out.println("【批量任务】(全量版) 成功更新了 " + allHoldings.size() + " 条持仓记录的最新市值。");
     }
 }

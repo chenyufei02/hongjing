@@ -2,6 +2,8 @@ package com.whu.hongjing.pojo.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -16,6 +18,8 @@ public class FundInfo {
     private String fundType;
 
     private Integer riskScore;
+
+    private BigDecimal netValue;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

@@ -1,9 +1,10 @@
 package com.whu.hongjing.service;
 
+import com.baomidou.mybatisplus.extension.service.IService;
 import com.whu.hongjing.pojo.entity.Customer;
 import java.util.List;
 
-public interface CustomerService {
+public interface CustomerService extends IService<Customer>{
     boolean removeCustomer(Long id);
 
     boolean updateCustomer(Customer customer);

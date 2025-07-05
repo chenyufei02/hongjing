@@ -9,6 +9,8 @@ import com.whu.hongjing.pojo.dto.FundRedeemDTO;
 import com.whu.hongjing.pojo.entity.CustomerHolding;
 import com.whu.hongjing.pojo.entity.FundTransaction;
 import com.whu.hongjing.service.CustomerHoldingService;
+import com.whu.hongjing.pojo.entity.FundInfo;
+import com.whu.hongjing.service.FundInfoService;
 import com.whu.hongjing.service.FundDataService;
 import com.whu.hongjing.service.FundTransactionService;
 import org.springframework.beans.BeanUtils;
@@ -16,9 +18,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.Assert;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 
 /**
  * 基金交易服务实现类
@@ -27,11 +31,8 @@ import java.math.RoundingMode;
 @Service
 public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMapper, FundTransaction> implements FundTransactionService {
 
-    /**
-     * 注入模拟的基金数据服务，用于获取基金净值
-     */
     @Autowired
-    private FundDataService fundDataService;
+    private FundInfoService fundInfoService;
 
     /**
      * 使用@Lazy注解懒加载客户持仓服务，以解决循环依赖问题
@@ -48,8 +49,12 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
     @Override
     @Transactional
     public FundTransaction createPurchaseTransaction(FundPurchaseDTO dto) {
-        // 1. 从外部服务获取基金的最新净值
-        BigDecimal sharePrice = fundDataService.getLatestNetValue(dto.getFundCode());
+        // 1. 从我们自己的数据库中，获取该基金最新的、可靠的净值
+        // TODO 这里是昨日的收盘净值 后续可优化为消息队列在下午收盘更新完持仓以后再发生真实交易
+        FundInfo fundInfo = fundInfoService.getById(dto.getFundCode());
+        Assert.notNull(fundInfo, "找不到对应的基金信息：" + dto.getFundCode());
+        Assert.notNull(fundInfo.getNetValue(), "该基金暂无有效的净值信息，无法交易。");
+        BigDecimal sharePrice = fundInfo.getNetValue();
 
         // 2. 创建交易实体，并从DTO复制基础属性
         FundTransaction transaction = new FundTransaction();
@@ -93,8 +98,11 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
             );
         }
 
-        // 2. 从外部服务获取基金的最新净值
-        BigDecimal sharePrice = fundDataService.getLatestNetValue(dto.getFundCode());
+        // 2. 从我们自己的数据库中，获取该基金最新的、可靠的净值
+        FundInfo fundInfo = fundInfoService.getById(dto.getFundCode());
+        Assert.notNull(fundInfo, "找不到对应的基金信息：" + dto.getFundCode());
+        Assert.notNull(fundInfo.getNetValue(), "该基金暂无有效的净值信息，无法交易。");
+        BigDecimal sharePrice = fundInfo.getNetValue();
 
         // 3. 创建交易实体
         FundTransaction transaction = new FundTransaction();
@@ -110,6 +118,34 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
         // 5. 保存交易并触发持仓更新
         return saveTransactionAndUpdateHolding(transaction);
     }
+
+
+
+    // 这里两个是为了只根据几个简单的信息快速生成交易数据使用的 避免每次生成交易数据都需要接收完整的DTO
+    @Override
+    public FundTransaction purchase(Long customerId, String fundCode, BigDecimal amount) {
+        // 复用我们之前写好的、更专业的逻辑
+        FundPurchaseDTO dto = new FundPurchaseDTO();
+        dto.setCustomerId(customerId);
+        dto.setFundCode(fundCode);
+        dto.setTransactionAmount(amount);
+        dto.setTransactionTime(LocalDateTime.now());
+        return this.createPurchaseTransaction(dto);
+    }
+
+    @Override
+    public FundTransaction redeem(Long customerId, String fundCode, BigDecimal shares) {
+        // 复用我们之前写好的、更专业的逻辑
+        FundRedeemDTO dto = new FundRedeemDTO();
+        dto.setCustomerId(customerId);
+        dto.setFundCode(fundCode);
+        dto.setTransactionShares(shares);
+        dto.setTransactionTime(LocalDateTime.now());
+        return this.createRedeemTransaction(dto);
+    }
+
+
+
 
     /**
      * 私有辅助方法，用于统一处理保存交易和更新持仓的逻辑
