@@ -126,6 +126,13 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
         return true;
     }
 
+    /**
+     * 处理一笔新交易后自动更新客户持仓
+     * @param
+     * @return void
+     * @author yufei
+     * @since 2025/7/5
+     */
     @Override
     @Transactional
     public void updateHoldingAfterNewTransaction(FundTransaction transaction) {
@@ -183,7 +190,6 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
     }
 
     @Override
-    @Transactional
     public void recalculateAllMarketValues() {
         // 1. 一次性获取所有基金的净值
         Map<String, BigDecimal> fundPriceMap = fundInfoService.list().stream()

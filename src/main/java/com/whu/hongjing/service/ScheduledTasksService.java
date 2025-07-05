@@ -17,7 +17,7 @@ public class ScheduledTasksService {
     @Autowired
     private CustomerHoldingService customerHoldingService;
 
-    @Scheduled(cron = "0 54 16 * * ?")
+    @Scheduled(cron = "0 09 17 * * ?")
     @Transactional
     public void updateNetValueAndMarketValueDaily() {
         System.out.println("【定时任务】开始执行每日净值与市值更新...");

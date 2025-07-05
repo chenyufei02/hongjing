@@ -23,14 +23,6 @@ public class FundTransactionController {
     @Autowired
     private FundTransactionService fundTransactionService;
 
-//    @Operation(summary = "新增一条基金交易记录")
-//    @PostMapping("/add")
-//    public FundTransaction addTransaction(@RequestBody @Validated FundTransactionDTO dto) {
-//        FundTransaction transaction = new FundTransaction();
-//        BeanUtils.copyProperties(dto, transaction);
-//        return fundTransactionService.createTransactionAndUpdateHolding(dto);
-//    }
-
     @Operation(summary = "申购基金")
     @PostMapping("/purchase")
     public FundTransaction purchase(@RequestBody @Validated FundPurchaseDTO dto) {

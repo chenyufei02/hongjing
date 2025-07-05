@@ -11,7 +11,6 @@ import com.whu.hongjing.pojo.entity.FundTransaction;
 import com.whu.hongjing.service.CustomerHoldingService;
 import com.whu.hongjing.pojo.entity.FundInfo;
 import com.whu.hongjing.service.FundInfoService;
-import com.whu.hongjing.service.FundDataService;
 import com.whu.hongjing.service.FundTransactionService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,6 +53,8 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
         FundInfo fundInfo = fundInfoService.getById(dto.getFundCode());
         Assert.notNull(fundInfo, "找不到对应的基金信息：" + dto.getFundCode());
         Assert.notNull(fundInfo.getNetValue(), "该基金暂无有效的净值信息，无法交易。");
+
+        // 取出前一日的净值
         BigDecimal sharePrice = fundInfo.getNetValue();
 
         // 2. 创建交易实体，并从DTO复制基础属性
