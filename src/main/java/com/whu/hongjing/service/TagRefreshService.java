@@ -1,6 +1,7 @@
 package com.whu.hongjing.service;
 
 import com.whu.hongjing.pojo.entity.Customer;
+import com.whu.hongjing.pojo.entity.CustomerHolding;
 import com.whu.hongjing.pojo.entity.CustomerTagRelation;
 
 import java.util.List;
@@ -22,7 +23,7 @@ public interface TagRefreshService {
      * @param customer 客户实体对象
      * @return 该客户的所有新标签列表
      */
-    List<CustomerTagRelation> calculateTagsForCustomer(Customer customer);
+    List<CustomerTagRelation> calculateTagsForCustomer(Customer customer , List<CustomerHolding> holdings);
 
     /**
      * 【新增】原子化批量刷新：先清空所有标签，再批量插入所有新标签

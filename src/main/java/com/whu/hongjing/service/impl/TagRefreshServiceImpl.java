@@ -31,12 +31,10 @@ public class TagRefreshServiceImpl implements TagRefreshService {
     @Autowired
     private CustomerHoldingService customerHoldingService;
     @Autowired
-    private FundTransactionService fundTransactionService;
-    @Autowired
     private CustomerTagRelationService customerTagRelationService;
 
     /**
-     * 旧的刷新方法，保持不变，用于单个客户的刷新场景
+     * 用于单个客户的刷新场景
      */
     @Override
     @Transactional
@@ -47,8 +45,9 @@ public class TagRefreshServiceImpl implements TagRefreshService {
             return;
         }
 
-        // 1. 调用纯计算方法得到新标签
-        List<CustomerTagRelation> newTags = calculateTagsForCustomer(customer);
+        // 1. 调用纯计算方法得到新标签(先查询持仓)
+        List<CustomerHolding> holdings = customerHoldingService.listByCustomerId(customerId);
+        List<CustomerTagRelation> newTags = calculateTagsForCustomer(customer, holdings);
         System.out.println("为客户 " + customerId + " 计算出 " + newTags.size() + " 个新标签。");
 
         // 2. “先删后增”：原子化地更新客户的标签
@@ -69,7 +68,7 @@ public class TagRefreshServiceImpl implements TagRefreshService {
      * 【新实现】纯计算方法，只负责计算，不写入数据库
      */
     @Override
-    public List<CustomerTagRelation> calculateTagsForCustomer(Customer customer) {
+    public List<CustomerTagRelation> calculateTagsForCustomer(Customer customer, List<CustomerHolding> holdings) {
         if (customer == null) {
             return new ArrayList<>();
         }
@@ -78,7 +77,6 @@ public class TagRefreshServiceImpl implements TagRefreshService {
         QueryWrapper<RiskAssessment> riskQuery = new QueryWrapper<>();
         riskQuery.eq("customer_id", customer.getId()).orderByDesc("assessment_date").last("LIMIT 1");
         RiskAssessment latestAssessment = riskAssessmentService.getOne(riskQuery);
-        List<CustomerHolding> holdings = customerHoldingService.listByCustomerId(customer.getId());
 
         // 2. 初始化一个列表，用来存放所有新计算出的标签
         List<CustomerTagRelation> newTags = new ArrayList<>();
@@ -121,11 +119,11 @@ public class TagRefreshServiceImpl implements TagRefreshService {
             int age = Period.between(customer.getBirthDate(), LocalDate.now()).getYears();
             tags.add(new CustomerTagRelation(customer.getId(), age + "岁", "年龄"));
             String ageGroupTag;
-            if (age >= 60) ageGroupTag = "60后及以上";
-            else if (age >= 50) ageGroupTag = "70后";
-            else if (age >= 40) ageGroupTag = "80后";
-            else if (age >= 30) ageGroupTag = "90后";
-            else if (age >= 20) ageGroupTag = "00后";
+            if (age >= 55) ageGroupTag = "60后及以上";
+            else if (age >= 45) ageGroupTag = "70后";
+            else if (age >= 35) ageGroupTag = "80后";
+            else if (age >= 25) ageGroupTag = "90后";
+            else if (age >= 15) ageGroupTag = "00后";
             else ageGroupTag = "10后";
             tags.add(new CustomerTagRelation(customer.getId(), ageGroupTag, "年龄分代"));
         }
@@ -135,28 +133,35 @@ public class TagRefreshServiceImpl implements TagRefreshService {
                                          RiskAssessment assessment, List<CustomerHolding> holdings) {
         String statedRiskLevelName = (assessment != null && assessment.getRiskLevel() != null)
                                      ? assessment.getRiskLevel() : "未知";
-        tags.add(new CustomerTagRelation(customer.getId(), statedRiskLevelName, "风险评估等级"));
+
+        // 新的标签名："风险评估:成长型", "风险评估:未知"
+        tags.add(new CustomerTagRelation(customer.getId(), "申报风险:" + statedRiskLevelName, "风险偏好"));
 
         if (holdings.isEmpty()) {
-            tags.add(new CustomerTagRelation(customer.getId(), "暂无持仓", "持仓风险偏好"));
-            tags.add(new CustomerTagRelation(customer.getId(), "诊断信息不足", "风险诊断"));
+            tags.add(new CustomerTagRelation(customer.getId(), "持仓风险:暂无持仓", "风险偏好"));
+            tags.add(new CustomerTagRelation(customer.getId(), "风险诊断:信息不足", "风险诊断"));
             return;
         }
 
+        // --- 让实盘风险的标签名更具体，并统一标签大类 ---
         String realRiskLevelName = calculateRealRiskLevel(holdings);
-        tags.add(new CustomerTagRelation(customer.getId(), realRiskLevelName, "持仓风险偏好"));
+        // 新的标签名："持仓表现:成长型"
+        tags.add(new CustomerTagRelation(customer.getId(), "持仓风险:" + realRiskLevelName, "风险偏好"));
 
+        // --- 让诊断标签也更具体 ---
         String diagnosticTag;
         if ("未知".equals(statedRiskLevelName) || "未知".equals(realRiskLevelName) || "暂无持仓".equals(realRiskLevelName)) {
-            diagnosticTag = "诊断信息不足";
+            diagnosticTag = "信息不足";
         } else if (statedRiskLevelName.equals(realRiskLevelName)) {
-            diagnosticTag = "风险匹配";
+            diagnosticTag = "知行合一";
         } else if (isRiskier(statedRiskLevelName, realRiskLevelName)) {
             diagnosticTag = "行为保守";
         } else {
             diagnosticTag = "行为激进";
         }
-        tags.add(new CustomerTagRelation(customer.getId(), diagnosticTag, "风险诊断"));
+        // 新的标签名："风险诊断:知行合一"
+        tags.add(new CustomerTagRelation(customer.getId(), "风险诊断:" + diagnosticTag, "风险诊断"));
+
     }
 
     private String calculateRealRiskLevel(List<CustomerHolding> holdings) {

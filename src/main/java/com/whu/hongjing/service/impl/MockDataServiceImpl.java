@@ -237,6 +237,27 @@ public class MockDataServiceImpl implements MockDataService {
                     if (h.getLastUpdateDate() == null) h.setLastUpdateDate(LocalDateTime.now());
                 })
                 .collect(Collectors.toList());
+
+        // 在写入数据库前，为所有持仓计算最新的市值
+        System.out.println("【演绎】开始为 " + allFinalHoldings.size() + " 条最终持仓记录计算最新市值...");
+        for (CustomerHolding holding : allFinalHoldings) {
+            FundInfo fundInfo = fundInfoMap.get(holding.getFundCode());
+            // 确保持有份额和基金净值都有效
+            if (holding.getTotalShares() != null && fundInfo != null && fundInfo.getNetValue() != null) {
+                BigDecimal marketValue = holding.getTotalShares()
+                                                .multiply(fundInfo.getNetValue())
+                                                .setScale(2, RoundingMode.HALF_UP);
+                holding.setMarketValue(marketValue); // 设置计算出的市值
+            } else {
+                holding.setMarketValue(BigDecimal.ZERO); // 如果无法计算，则设置为0
+            }
+
+            // 顺便修复在平铺过程中可能丢失的默认值
+            if (holding.getAverageCost() == null) holding.setAverageCost(BigDecimal.ZERO);
+            if (holding.getLastUpdateDate() == null) holding.setLastUpdateDate(LocalDateTime.now());
+        }
+        System.out.println("【演绎】市值计算完成！");
+
         if (!allFinalHoldings.isEmpty()) {
             customerHoldingService.saveOrUpdateBatch(allFinalHoldings, 2000);
             System.out.println("【演绎】成功批量更新/插入 " + allFinalHoldings.size() + " 条持仓记录。");
@@ -260,8 +281,15 @@ public class MockDataServiceImpl implements MockDataService {
         // b. 并行计算：将每个客户的标签计算任务提交给线程池
         List<Future<List<CustomerTagRelation>>> futures = new ArrayList<>();
         for (Customer customer : allCustomers) {
+            // 在这里把持仓数据从Map里取出来，传给任务
+            // 从我们的大Map里获取当前客户的持仓子Map，如果不存在则返回一个空Map
+            Map<String, CustomerHolding> customerHoldingsMap = holdingsByCustomer.getOrDefault(customer.getId(), Collections.emptyMap());
+            // 将子Map的值（持仓对象）转为一个List
+            List<CustomerHolding> customerHoldingsList = new ArrayList<>(customerHoldingsMap.values());
+
             Future<List<CustomerTagRelation>> future = executorService.submit(() ->
-                    tagRefreshService.calculateTagsForCustomer(customer)
+                    // 把持仓列表作为参数传进去
+                    tagRefreshService.calculateTagsForCustomer(customer, customerHoldingsList)
             );
             futures.add(future);
         }
