@@ -134,7 +134,6 @@ public class MockDataServiceImpl implements MockDataService {
                 List<CustomerHolding> customerCurrentHoldings = new ArrayList<>(customerHoldings.values());
                 customerCurrentHoldings.removeIf(h -> h.getTotalShares() == null || h.getTotalShares().compareTo(BigDecimal.ZERO) <= 0);
 
-
                 FundInfo targetFund; // 目标操作的基金
                 boolean isPurchase;  // 判断是申购还是赎回（false）
 
@@ -192,9 +191,7 @@ public class MockDataServiceImpl implements MockDataService {
                         holding.setTotalShares(newTotalShares);
                         holding.setAverageCost(newTotalCost.divide(newTotalShares, 4, RoundingMode.HALF_UP));
                     }
-                    holding.setLastUpdateDate(transactionTime);
-                    // 将更新后的持仓放回客户自己的Map
-                    customerHoldings.put(targetFund.getFundCode(), holding);
+                    // 将更新后的持仓放回客户自己的Map（提取到申购与赎回的公共字段）
 
                     // 如果是赎回操作
                 } else {
@@ -214,10 +211,11 @@ public class MockDataServiceImpl implements MockDataService {
                     // 发生新的交易记录
                     newTransactions.add(tx);
                     holding.setTotalShares(holding.getTotalShares().subtract(redeemShares));
-                    holding.setLastUpdateDate(transactionTime);
-                    // 将更新后的持仓放回客户自己的Map
-                    customerHoldings.put(targetFund.getFundCode(), holding);
+                    // 赎回不影响平均持仓成本 因此不用更新averageCost
+                    // 将更新后的持仓放回客户自己的Map（提取到申购与赎回的公共字段）
                 }
+                holding.setLastUpdateDate(transactionTime);
+                customerHoldings.put(targetFund.getFundCode(), holding);
             }
             // 在处理完一个客户的所有天数后，将他的持仓状态明确更新回主Map
             holdingsByCustomer.put(customer.getId(), customerHoldings);
