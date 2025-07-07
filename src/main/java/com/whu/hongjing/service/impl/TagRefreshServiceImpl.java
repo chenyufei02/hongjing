@@ -1,15 +1,14 @@
 package com.whu.hongjing.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.whu.hongjing.enums.RiskLevelEnum;
 import com.whu.hongjing.pojo.entity.*;
 import com.whu.hongjing.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.Period;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
@@ -17,447 +16,232 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
+import java.util.Optional;
+import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
-import java.time.LocalDateTime;
-
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+/**
+ * 客户画像刷新服务的核心实现类。
+ * 负责统一计算和更新客户的所有画像数据，包括量化指标和分类标签。
+ */
 @Service
 public class TagRefreshServiceImpl implements TagRefreshService {
 
-    // 注入所有我们需要的数据源服务
+    // 注入所有需要用到的服务
     @Autowired
     private CustomerService customerService;
-    @Autowired
-    private FundInfoService fundInfoService;
     @Autowired
     private RiskAssessmentService riskAssessmentService;
     @Autowired
     private CustomerHoldingService customerHoldingService;
     @Autowired
+    private FundTransactionService fundTransactionService;
+    @Autowired
+    private CustomerProfileService customerProfileService;
+    @Autowired
     private CustomerTagRelationService customerTagRelationService;
     @Autowired
-    private FundTransactionService fundTransactionService;
+    private TagRefreshService self;
 
     /**
-     * 用于单个客户的刷新场景，调用了下面为单个客户计算所有标签的方法，并用客户标签服务实现类保存到数据库。
+     * 【核心原子方法】为单个客户刷新所有画像数据（指标+标签）。
+     * 这是所有实时、单体更新的入口（例如，交易发生后自动调用此方法）。
+     * 此方法带有 @Transactional 注解，确保对单个客户的所有数据库操作要么全部成功，要么全部失败，保证了数据的一致性。
+     *
+     * @param customerId 要刷新画像的客户ID
      */
     @Override
     @Transactional
     public void refreshTagsForCustomer(Long customerId) {
-        Customer customer = customerService.getCustomerById(customerId);
+        // 1. 获取该客户进行画像计算所需的所有基础数据
+        Customer customer = customerService.getById(customerId);
         if (customer == null) {
-            System.err.println("客户不存在，无法刷新标签。ID: " + customerId);
+            // 如果客户不存在，直接返回，不做任何操作
             return;
-        }  // 非空检验 空客户直接返回
+        }
 
-        // 1. 调用纯计算方法得到新标签(先查询持仓)
         List<CustomerHolding> holdings = customerHoldingService.listByCustomerId(customerId);
-        List<CustomerTagRelation> newTags = calculateTagsForCustomer(customer, holdings);
-        System.out.println("为客户 " + customerId + " 计算出 " + newTags.size() + " 个新标签。");
+        List<FundTransaction> transactions = fundTransactionService.list(
+                new QueryWrapper<FundTransaction>().eq("customer_id", customerId)
+        );
+        RiskAssessment latestAssessment = riskAssessmentService.getOne(
+                new QueryWrapper<RiskAssessment>().eq("customer_id", customer.getId()).orderByDesc("assessment_date").last("LIMIT 1")
+        );
 
-        // 2. “先删后增”：原子化地更新客户的标签
-        // a. 删除该客户所有的旧标签（这里只删除单个 下面的批量保存方法删除全表）
-        QueryWrapper<CustomerTagRelation> deleteWrapper = new QueryWrapper<>();
-        deleteWrapper.eq("customer_id", customerId);
-        customerTagRelationService.remove(deleteWrapper);
+        // 2. 调用私有方法，计算并保存该客户的核心“量化指标”到 customer_profile 表
+        calculateAndSaveProfile(customer, holdings, transactions);
 
-        // b. 如果有新标签，则批量插入
+        // 3. 调用私有方法，计算该客户的所有“分类标签”
+        List<CustomerTagRelation> newTags = calculateCategoricalTags(customer, latestAssessment);
+
+        // 4. 更新数据库中的分类标签（采用“先删后增”策略，确保数据最新）
+        customerTagRelationService.remove(new QueryWrapper<CustomerTagRelation>().eq("customer_id", customerId));
         if (!newTags.isEmpty()) {
             customerTagRelationService.saveBatch(newTags);
         }
-
-        System.out.println("客户 " + customerId + " 的标签已刷新完毕！");
     }
 
     /**
-     * 【新实现】纯计算方法，只负责计算， 为某客户计算所有的标签，不写入数据库
+     * 【批量并行方法】刷新所有客户的画像数据。
+     * 这是所有批量、定时任务的入口（例如，每日凌晨的全量刷新任务）。
      */
     @Override
-    public List<CustomerTagRelation> calculateTagsForCustomer(Customer customer, List<CustomerHolding> holdings) {
-        if (customer == null) {
-            return new ArrayList<>();
-        }
+    public void refreshAllTagsAtomically() {
+        List<Customer> allCustomers = customerService.list();
+        // 创建一个信号量，只允许最多200个线程同时访问数据库
+        Semaphore dbSemaphore = new Semaphore(200);
+        System.out.println("【批量刷新启动】准备为 " + allCustomers.size() + " 位客户并行更新画像数据...");
 
-        // 1. 获取该客户的所有维度的基础数据 (这部分是只读的，并发安全)
-        QueryWrapper<RiskAssessment> riskQuery = new QueryWrapper<>();
-        riskQuery.eq("customer_id", customer.getId()).orderByDesc("assessment_date").last("LIMIT 1");
-        RiskAssessment latestAssessment = riskAssessmentService.getOne(riskQuery);
+        // 【!!! 终极方案 !!!】
+        // 不再使用 parallelStream，而是创建一个“为每个任务都分配一个新虚拟线程”的专用执行器
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
 
-        // 2. 初始化一个列表，用来存放所有新计算出的标签
-        List<CustomerTagRelation> newTags = new ArrayList<>();
-
-        // 3. === 在这里逐一调用各种标签的计算方法 ===
-        calculateAndAddDemographicTags(newTags, customer);
-        calculateAndAddRiskTags(newTags, customer, latestAssessment, holdings);
-        calculateAndAddHoldingAnalysisTags(newTags, customer, holdings);
-        calculateAndAddRfmTags(newTags, customer, holdings);
-
-        return newTags;
-    }
-
-    /**
-     * 【新实现】原子化批量写入方法（针对全表，会先清空全表，因此针对单客户更新标签时只能调用CustomerServiceImpl.saveBatch保存单个到数据库）
-     */
-    @Override
-    @Transactional
-    public void refreshAllTagsAtomically(List<CustomerTagRelation> allNewTags) {
-        // 1. 为了效率，直接清空全表
-        customerTagRelationService.remove(new QueryWrapper<>());
-        System.out.println("【标签刷新】已清空 customer_tag_relation 表。");
-
-        // 2. 一次性批量插入所有新计算出的标签
-        if (allNewTags != null && !allNewTags.isEmpty()) {
-            customerTagRelationService.saveBatch(allNewTags, 2000); // 每2000条一批次
-            System.out.println("【标签刷新】已成功批量插入 " + allNewTags.size() + " 个新标签。");
-        }
-    }
-
-
-    // --- 以下是私有的、纯计算的辅助方法 ---
-
-    /**
-     * 计算人口属性标签
-     * @param
-     * @return void
-     * @author yufei
-     * @since 2025/7/6
-     */
-    private void calculateAndAddDemographicTags(List<CustomerTagRelation> tags, Customer customer) {
-        if (customer.getGender() != null && !customer.getGender().isEmpty()) {
-            tags.add(new CustomerTagRelation(customer.getId(), customer.getGender(), "性别"));
-        }
-        if (customer.getOccupation() != null && !customer.getOccupation().isEmpty()) {
-            tags.add(new CustomerTagRelation(customer.getId(), customer.getOccupation(), "职业"));
-        }
-        if (customer.getBirthDate() != null) {
-            int age = Period.between(customer.getBirthDate(), LocalDate.now()).getYears();
-            tags.add(new CustomerTagRelation(customer.getId(), age + "岁", "年龄"));
-            String ageGroupTag;
-            if (age >= 55) ageGroupTag = "60后及以上";
-            else if (age >= 45) ageGroupTag = "70后";
-            else if (age >= 35) ageGroupTag = "80后";
-            else if (age >= 25) ageGroupTag = "90后";
-            else if (age >= 15) ageGroupTag = "00后";
-            else ageGroupTag = "10后";
-            tags.add(new CustomerTagRelation(customer.getId(), ageGroupTag, "年龄分代"));
-        }
-    }
-
-    /**
-     * 计算风险诊断标签
-     * @param
-     * @return void
-     * @author yufei
-     * @since 2025/7/6
-     */
-    private void calculateAndAddRiskTags(List<CustomerTagRelation> tags, Customer customer,
-                                         RiskAssessment assessment, List<CustomerHolding> holdings) {
-        String statedRiskLevelName = (assessment != null && assessment.getRiskLevel() != null)
-                                     ? assessment.getRiskLevel() : "未知";
-
-        // 新的标签名："风险评估:成长型", "风险评估:未知"
-        tags.add(new CustomerTagRelation(customer.getId(), "申报风险:" + statedRiskLevelName, "风险偏好"));
-
-        if (holdings.isEmpty()) {
-            tags.add(new CustomerTagRelation(customer.getId(), "持仓风险:暂无持仓", "风险偏好"));
-            tags.add(new CustomerTagRelation(customer.getId(), "风险诊断:信息不足", "风险诊断"));
-            return;
-        }
-
-        // --- 让实盘风险的标签名更具体，并统一标签大类 ---
-        String realRiskLevelName = calculateRealRiskLevel(holdings);
-        // 新的标签名："持仓表现:成长型"
-        tags.add(new CustomerTagRelation(customer.getId(), "持仓风险:" + realRiskLevelName, "风险偏好"));
-
-        // --- 让诊断标签也更具体 ---
-        String diagnosticTag;
-        if ("未知".equals(statedRiskLevelName) || "未知".equals(realRiskLevelName) || "暂无持仓".equals(realRiskLevelName)) {
-            diagnosticTag = "信息不足";
-        } else if (statedRiskLevelName.equals(realRiskLevelName)) {
-            diagnosticTag = "知行合一";
-        } else if (isRiskier(statedRiskLevelName, realRiskLevelName)) {
-            diagnosticTag = "行为保守";
-        } else {
-            diagnosticTag = "行为激进";
-        }
-        // 新的标签名："风险诊断:知行合一"
-        tags.add(new CustomerTagRelation(customer.getId(), "风险诊断:" + diagnosticTag, "风险诊断"));
-
-    }
-
-    /**
-     * 计算实盘风险标签
-     * @param
-     * @return java.lang.String
-     * @author yufei
-     * @since 2025/7/6
-     */
-    private String calculateRealRiskLevel(List<CustomerHolding> holdings) {
-        List<String> fundCodes = holdings.stream().map(CustomerHolding::getFundCode).distinct().collect(Collectors.toList());
-        if (fundCodes.isEmpty()) {
-            return "未知";
-        }
-        Map<String, FundInfo> fundInfoMap = fundInfoService.listByIds(fundCodes).stream()
-                .collect(Collectors.toMap(FundInfo::getFundCode, Function.identity()));
-
-        BigDecimal totalMarketValue = BigDecimal.ZERO;
-        BigDecimal totalWeightedRisk = BigDecimal.ZERO;
-
-        for (CustomerHolding holding : holdings) {
-            FundInfo fundInfo = fundInfoMap.get(holding.getFundCode());
-            if (holding.getMarketValue() != null && fundInfo != null && fundInfo.getRiskScore() != null) {
-                totalMarketValue = totalMarketValue.add(holding.getMarketValue());
-                totalWeightedRisk = totalWeightedRisk.add(
-                    holding.getMarketValue().multiply(new BigDecimal(fundInfo.getRiskScore()))
-                );
+            // 遍历所有客户，为每一个客户的刷新任务都提交到执行器中
+            // 执行器会为这成百上千个任务，都创建一个极其轻量的虚拟线程去执行
+            for (Customer customer : allCustomers) {
+                executor.submit(() -> {
+                    try {
+                        dbSemaphore.acquire(); // 在访问数据库前，先获取一个“许可”
+                        // 在虚拟线程中，调用我们功能完整的、带事务的单体刷新方法
+                        self.refreshTagsForCustomer(customer.getId());
+                    } catch (Exception e) {
+                        System.err.println("【批量刷新错误】处理客户 " + customer.getId() + " 时发生异常: " + e.getMessage());
+                    } finally {
+                        dbSemaphore.release(); // 无论成功失败，一定要释放“许可”
+                    }
+                });
             }
+            // try-with-resources 结构会自动关闭执行器，等待所有任务完成
         }
 
-        if (totalMarketValue.compareTo(BigDecimal.ZERO) <= 0) {
-            return "未知";
-        }
-
-        double avgRiskScore = totalWeightedRisk.divide(totalMarketValue, 2, RoundingMode.HALF_UP).doubleValue();
-        RiskLevelEnum realRiskEnum = RiskLevelEnum.getByScore((int) Math.round(avgRiskScore * 20)); // 分数范围转换
-        return realRiskEnum.getLevelName();
+        System.out.println("【批量刷新完成】所有客户画像数据更新任务已结束。");
     }
 
     /**
-     * 辅助进行评估与实盘的风险比较
-     * @param
-     * @return boolean
-     * @author yufei
-     * @since 2025/7/6
+     * 私有辅助方法：计算并保存一个客户的所有核心量化指标。
+     * @param customer     客户实体
+     * @param holdings     该客户的所有持仓记录
+     * @param transactions 该客户的所有交易记录
      */
-    private boolean isRiskier(String riskLevelName1, String riskLevelName2) {
-        try {
-            RiskLevelEnum level1 = findEnumByLevelName(riskLevelName1);
-            RiskLevelEnum level2 = findEnumByLevelName(riskLevelName2);
-            return level1.ordinal() > level2.ordinal();
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
-    /**
-     * 返回风险等级的枚举类
-     * @param
-     * @return com.whu.hongjing.enums.RiskLevelEnum
-     * @author yufei
-     * @since 2025/7/6
-     */
-    private RiskLevelEnum findEnumByLevelName(String levelName) {
-        for (RiskLevelEnum level : RiskLevelEnum.values()) {
-            if (level.getLevelName().equals(levelName)) {
-                return level;
-            }
-        }
-        throw new IllegalArgumentException("未知的风险等级名称: " + levelName);
-    }
-
-    /**
-     * 计算持仓分析相关的标签 (集中度, 持仓周期)
-     */
-    private void calculateAndAddHoldingAnalysisTags(List<CustomerTagRelation> tags, Customer customer, List<CustomerHolding> holdings) {
-        // 如果客户没有持仓，直接打上“暂无持仓”标签并返回
-        if (holdings == null || holdings.isEmpty()) {
-            tags.add(new CustomerTagRelation(customer.getId(), "暂无持仓", "持仓集中度"));
-            tags.add(new CustomerTagRelation(customer.getId(), "暂无持仓", "持仓周期"));
-            return;
+    private void calculateAndSaveProfile(Customer customer, List<CustomerHolding> holdings, List<FundTransaction> transactions) {
+        // 尝试从数据库获取已有的profile记录，如果没有则创建一个新的
+        CustomerProfile profile = customerProfileService.getById(customer.getId());
+        if (profile == null) {
+            profile = new CustomerProfile(customer.getId());
         }
 
-        // --- 计算持仓集中度 ---
-        BigDecimal totalMarketValue = holdings.stream()
-                .map(CustomerHolding::getMarketValue)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        if (totalMarketValue.compareTo(BigDecimal.ZERO) > 0) {
-            BigDecimal maxHoldingValue = holdings.stream()
-                    .map(CustomerHolding::getMarketValue)
-                    .filter(Objects::nonNull)
-                    .max(BigDecimal::compareTo)
-                    .orElse(BigDecimal.ZERO);
-
-            double concentrationRatio = maxHoldingValue.divide(totalMarketValue, 4, RoundingMode.HALF_UP).doubleValue();
-            String concentrationTag;
-            if (concentrationRatio > 0.5) {
-                concentrationTag = "持仓高度集中";
-            } else if (concentrationRatio > 0.2) {
-                concentrationTag = "持仓中度分散";
-            } else {
-                concentrationTag = "持仓高度分散";
-            }
-            tags.add(new CustomerTagRelation(customer.getId(), concentrationTag, "持仓集中度"));
-        } else {
-            tags.add(new CustomerTagRelation(customer.getId(), "市值信息不足", "持仓集中度"));
-        }
-
-        // --- 计算平均持仓周期 ---
-        BigDecimal totalWeightedDays = BigDecimal.ZERO;
-        int validHoldingsCount = 0;
-
-        for (CustomerHolding holding : holdings) {
-            // 为每一笔持仓，查询其最早的申购记录
-            QueryWrapper<FundTransaction> txQuery = new QueryWrapper<>();
-            txQuery.eq("customer_id", customer.getId())
-                   .eq("fund_code", holding.getFundCode())
-                   .eq("transaction_type", "申购")
-                   .orderByAsc("transaction_time")
-                   .last("LIMIT 1");
-            FundTransaction firstPurchase = fundTransactionService.getOne(txQuery);
-
-            if (firstPurchase != null) {
-                long holdingDays = Period.between(firstPurchase.getTransactionTime().toLocalDate(), LocalDate.now()).getDays();
-                BigDecimal marketValue = holding.getMarketValue() == null ? BigDecimal.ZERO : holding.getMarketValue();
-                totalWeightedDays = totalWeightedDays.add(new BigDecimal(holdingDays).multiply(marketValue));
-                validHoldingsCount++;
-            }
-        }
-
-        if (validHoldingsCount > 0 && totalMarketValue.compareTo(BigDecimal.ZERO) > 0) {
-            double avgHoldingDays = totalWeightedDays.divide(totalMarketValue, 0, RoundingMode.HALF_UP).doubleValue();
-            String periodTag;
-            if (avgHoldingDays > 180) {
-                periodTag = "长期持有型";
-            } else {
-                periodTag = "短期交易型";
-            }
-            tags.add(new CustomerTagRelation(customer.getId(), periodTag, "持仓周期"));
-        } else {
-             tags.add(new CustomerTagRelation(customer.getId(), "持仓周期未知", "持仓周期"));
-        }
-    }
-
-    /**
-     * RFM标签计算总入口
-     */
-    private void calculateAndAddRfmTags(List<CustomerTagRelation> tags, Customer customer, List<CustomerHolding> holdings) {
-        // 1. 根据已有的“持仓周期”标签，判断客户是一级分类中的哪一类
-        String holdingPeriodTag = tags.stream()
-                .filter(tag -> "持仓周期".equals(tag.getTagCategory()))
-                .map(CustomerTagRelation::getTagName)
-                .findFirst()
-                .orElse("未知");
-
-        // 2. 获取该客户的所有交易记录，这是RFM分析的基础
-        List<FundTransaction> transactions = fundTransactionService.list(
-                new QueryWrapper<FundTransaction>().eq("customer_id", customer.getId())
+        // --- 计算 M (Monetary): 总持仓市值 ---
+        profile.setTotalMarketValue(
+            holdings.stream().map(CustomerHolding::getMarketValue)
+                    .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add)
         );
 
-        String rfmTag;
-        // 3. 根据一级分类，进入不同的RFM模型进行计算
-        if ("长期持有型".equals(holdingPeriodTag)) {
-            rfmTag = calculateLongTermRfm(holdings, transactions);
-        } else { // 包括“短期交易型”、“暂无持仓”等都归入交易型模型判断
-            rfmTag = calculateTransactionalRfm(holdings, transactions);
+        // --- 计算 平均持仓天数 ---
+        if (!holdings.isEmpty()) {
+            // 【!!! 线程安全解惑 !!!】
+            // 这两个变量是在 calculateAndSaveProfile 方法内部定义的局部变量。
+            // 当 refreshAllTagsAtomically() 使用多线程调用此方法时，每个线程都会在自己的线程栈中创建一套全新的、
+            // 独立的 totalDaysSum 和 validHoldingsCount。它们之间天然隔离，互不干扰。
+            // 因此，这里使用普通的 long 和 int 是100%线程安全的，无需使用 AtomicLong。
+            long totalDaysSum = 0;
+            int validHoldingsCount = 0;
+
+            // 使用经典的 for-each 循环，逻辑最清晰、最易读
+            for (CustomerHolding holding : holdings) {
+                // 为客户的每一笔持仓，找到其最早的申购记录，以确定持仓起始日
+                FundTransaction firstPurchase = fundTransactionService.getOne(new QueryWrapper<FundTransaction>()
+                        .eq("customer_id", customer.getId()).eq("fund_code", holding.getFundCode())
+                        .eq("transaction_type", "申购").orderByAsc("transaction_time").last("LIMIT 1"));
+
+                if (firstPurchase != null) {
+                    // 计算从首次购买到今天的天数
+                    long days = Period.between(firstPurchase.getTransactionTime().toLocalDate(), LocalDate.now()).getDays();
+                    // 直接累加这些普通的局部变量
+                    totalDaysSum += days;
+                    validHoldingsCount++;
+                }
+            }
+
+            // 计算平均值并存入profile对象
+            if (validHoldingsCount > 0) {
+                profile.setAvgHoldingDays((int) (totalDaysSum / validHoldingsCount));
+            }
         }
 
-        // 4. 将最终计算出的客户分层标签加入列表
-        tags.add(new CustomerTagRelation(customer.getId(), rfmTag, "客户价值分层"));
-    }
+        if (!transactions.isEmpty()) {
+            // --- 计算 R (Recency): 最近交易距今天数 ---
+            Optional<LocalDateTime> lastTxTimeOpt = transactions.stream()
+                .map(FundTransaction::getTransactionTime).max(LocalDateTime::compareTo);
+            if (lastTxTimeOpt.isPresent()) {
+                profile.setRecencyDays((int) ChronoUnit.DAYS.between(lastTxTimeOpt.get(), LocalDateTime.now()));
+            }
 
-    /**
-     * 为“交易型客户”计算RFM分层
-     */
-    private String calculateTransactionalRfm(List<CustomerHolding> holdings, List<FundTransaction> transactions) {
-        if (transactions.isEmpty()) return "暂无交易客户";
+            // --- 计算 F (Frequency): 90天内交易次数 ---
+            profile.setFrequency90d((int) transactions.stream()
+                .filter(tx -> tx.getTransactionTime().isAfter(LocalDateTime.now().minusDays(90))).count());
 
-        // --- 计算 R (Recency) ---
-        long daysSinceLastTx = transactions.stream()
-                .map(FundTransaction::getTransactionTime)
-                .max(LocalDateTime::compareTo)
-                .map(lastTxTime -> ChronoUnit.DAYS.between(lastTxTime, LocalDateTime.now()))
-                .orElse(Long.MAX_VALUE);
-
-        int rScore = (daysSinceLastTx <= 30) ? 3 : (daysSinceLastTx <= 90) ? 2 : 1;
-
-        // --- 计算 F (Frequency) ---
-        LocalDateTime ninetyDaysAgo = LocalDateTime.now().minusDays(90);
-        long txCountIn90Days = transactions.stream()
-                .filter(tx -> tx.getTransactionTime().isAfter(ninetyDaysAgo))
-                .count();
-
-        int fScore = (txCountIn90Days > 10) ? 3 : (txCountIn90Days >= 3) ? 2 : 1;
-
-        // --- 计算 M (Monetary) ---
-        BigDecimal totalMarketValue = holdings.stream()
-                .map(CustomerHolding::getMarketValue)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        int mScore = (totalMarketValue.compareTo(new BigDecimal("500000")) > 0) ? 3
-                   : (totalMarketValue.compareTo(new BigDecimal("100000")) > 0) ? 2 : 1;
-
-        // --- 应用分层规则 ---
-        if (rScore == 3 && fScore == 3) return "核心价值客户";
-        if (rScore == 3 && fScore == 2) return "潜力增长客户";
-        if (rScore == 3 && fScore == 1) return "新进活跃客户";
-        if (rScore == 2 && fScore > 1) return "需要唤醒客户";
-        if (rScore == 1) return "休眠流失预警";
-
-        return "一般客户";
-    }
-
-    /**
-     * 为“长持型客户”计算RFM分层
-     */
-    private String calculateLongTermRfm(List<CustomerHolding> holdings, List<FundTransaction> transactions) {
-        if (transactions.isEmpty()) return "暂无交易客户";
-
-        // --- 计算 M (Monetary) - 采用你的建议，直接使用资产规模 ---
-        BigDecimal totalMarketValue = holdings.stream()
-                .map(CustomerHolding::getMarketValue)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        int mScore = (totalMarketValue.compareTo(new BigDecimal("500000")) > 0) ? 3
-                   : (totalMarketValue.compareTo(new BigDecimal("100000")) > 0) ? 2 : 1;
-
-        // --- 计算 R (Recency) - 最近净投入月份 ---
-        Map<YearMonth, BigDecimal> monthlyNetInvestment = transactions.stream()
-                .collect(Collectors.groupingBy(tx -> YearMonth.from(tx.getTransactionTime()),
-                        Collectors.reducing(BigDecimal.ZERO,
-                                tx -> "申购".equals(tx.getTransactionType()) ? tx.getTransactionAmount() : tx.getTransactionAmount().negate(),
-                                BigDecimal::add)
-                ));
-
-        long monthsSinceLastNetInvestment = monthlyNetInvestment.entrySet().stream()
-                .filter(entry -> entry.getValue().compareTo(BigDecimal.ZERO) > 0)
-                .map(Map.Entry::getKey)
-                .max(YearMonth::compareTo)
-                .map(lastYm -> ChronoUnit.MONTHS.between(lastYm, YearMonth.now()))
-                .orElse(Long.MAX_VALUE);
-
-        int rScore = (monthsSinceLastNetInvestment <= 3) ? 3 : (monthsSinceLastNetInvestment <= 6) ? 2 : 1;
-
-        // --- 计算 F (Frequency) - 定投行为 ---
-        Map<YearMonth, Boolean> monthlyPurchase = transactions.stream()
+            // --- 计算 F (定投行为) ---
+            // 1. 筛选出过去一年内所有申购的月份
+            Map<YearMonth, Boolean> monthlyPurchase = transactions.stream()
                 .filter(tx -> "申购".equals(tx.getTransactionType()) && tx.getTransactionTime().isAfter(LocalDateTime.now().minusYears(1)))
                 .collect(Collectors.toMap(tx -> YearMonth.from(tx.getTransactionTime()), v -> true, (a, b) -> a));
 
-        boolean hasRegularInvestment = false;
-        YearMonth currentMonth = YearMonth.now();
-        for (int i = 0; i < 10; i++) { // 检查过去12个月（最多检查10个起始点）
-            YearMonth start = currentMonth.minusMonths(i);
-            if (monthlyPurchase.getOrDefault(start, false) &&
-                monthlyPurchase.getOrDefault(start.minusMonths(1), false) &&
-                monthlyPurchase.getOrDefault(start.minusMonths(2), false)) {
-                hasRegularInvestment = true;
-                break;
+            // 2. 检查是否存在连续三个月都有申购记录
+            boolean hasRegularInvestment = false;
+            YearMonth currentMonth = YearMonth.now();
+            for (int i = 0; i < 10; i++) { // 从当月开始，向前滑动窗口检查
+                YearMonth start = currentMonth.minusMonths(i);
+                if (monthlyPurchase.getOrDefault(start, false) &&
+                        monthlyPurchase.getOrDefault(start.minusMonths(1), false) &&
+                        monthlyPurchase.getOrDefault(start.minusMonths(2), false)) {
+                    hasRegularInvestment = true;
+                    break; // 一旦找到，即可停止检查
+                }
             }
+            profile.setHasRegularInvestment(hasRegularInvestment);
         }
 
-        int fScore = hasRegularInvestment ? 3 : 1; // 定投只分“有”或“无”
-
-        // --- 应用分层规则 ---
-        if (mScore == 3) return "核心价值客户";
-        if (mScore == 2 && rScore == 3) return "忠诚成长客户";
-        if (mScore == 2 && rScore < 3) return "稳定持有客户";
-        if (mScore == 1 && fScore == 3) return "潜力定投客户";
-        if (mScore == 1 && rScore == 1) return "流失预警客户";
-
-        return "一般客户";
+        // 将填充好所有指标的profile对象，一次性保存或更新到数据库
+        customerProfileService.saveOrUpdate(profile);
     }
 
+    /**
+     * 私有辅助方法：计算一个客户的所有“分类”性质的标签。
+     * 这些标签通常是文本，不适合做数值筛选，但适合用于前端直接展示。
+     * @param customer  客户实体
+     * @param assessment 该客户的最新风险评估记录
+     * @return 一个包含所有分类标签的关系对象列表
+     */
+    private List<CustomerTagRelation> calculateCategoricalTags(Customer customer, RiskAssessment assessment) {
+        List<CustomerTagRelation> tags = new ArrayList<>();
+
+        // 1. 人口属性标签
+        if (customer.getGender() != null) tags.add(new CustomerTagRelation(customer.getId(), customer.getGender(), "性别"));
+        if (customer.getOccupation() != null) tags.add(new CustomerTagRelation(customer.getId(), customer.getOccupation(), "职业"));
+        if (customer.getBirthDate() != null) {
+            tags.add(new CustomerTagRelation(customer.getId(), getAgeGroupTag(Period.between(customer.getBirthDate(), LocalDate.now()).getYears()), "年龄分代"));
+        }
+
+        // 2. 风险评估标签
+        String statedRiskLevelName = (assessment != null && assessment.getRiskLevel() != null)
+                ? assessment.getRiskLevel() : "未知";
+        tags.add(new CustomerTagRelation(customer.getId(), statedRiskLevelName, "申报风险等级"));
+
+        // 3. 未来可以再这里加入更多真正的“分类”标签，比如“渠道来源: 线上APP”等
+
+        return tags;
+    }
+
+    /**
+     * 私有辅助方法：根据年龄计算年龄分代标签
+     */
+    private String getAgeGroupTag(int age) {
+        if (age >= 60) return "60后及以上";
+        if (age >= 50) return "70后";
+        if (age >= 40) return "80后";
+        if (age >= 30) return "90后";
+        if (age >= 20) return "00后";
+        return "10后";
+    }
 }
