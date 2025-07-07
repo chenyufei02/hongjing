@@ -27,4 +27,23 @@ public class TagController {
             return new ApiResponseVO(false, "标签刷新失败: " + e.getMessage());
         }
     }
+
+    /**
+     * 手动触发一次对所有客户的全量画像刷新。(异步操作，接口会立即返回，后台将开始执行耗时的批量任务。)
+     */
+    @PostMapping("/refresh-all")
+    @Operation(summary = "【手动触发】刷新所有客户的标签（异步后台任务）")
+    public ApiResponseVO refreshAllCustomerTags() {
+        try {
+            // 直接调用我们的异步批量服务
+            tagRefreshService.refreshAllTagsAtomically();
+            // 立即返回成功响应，告知前端任务已启动
+            return new ApiResponseVO(true, "全量客户标签刷新任务已成功启动，将在后台运行。");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ApiResponseVO(false, "启动全量刷新任务失败: " + e.getMessage());
+        }
+    }
+
+
 }

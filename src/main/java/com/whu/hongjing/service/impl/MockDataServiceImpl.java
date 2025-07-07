@@ -8,6 +8,7 @@ import com.whu.hongjing.pojo.entity.FundInfo;
 import com.whu.hongjing.pojo.entity.FundTransaction;
 import com.whu.hongjing.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,7 +35,10 @@ public class MockDataServiceImpl implements MockDataService {
     @Autowired
     private CustomerHoldingService customerHoldingService;
     @Autowired
+    @Lazy
     private TagRefreshService tagRefreshService; // 保持注入
+
+    // TODO 改造代码 直接线程池 + MP乐观锁模拟新增数据
 
     private static final String[] OCCUPATIONS = {
             "软件工程师", "项目经理", "产品经理", "数据分析师", "教师",
