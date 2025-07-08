@@ -1,7 +1,8 @@
 package com.whu.hongjing.service;
-
+import java.time.LocalDate;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.whu.hongjing.pojo.entity.CustomerHolding;
+import com.whu.hongjing.pojo.entity.FundInfo;
 import com.whu.hongjing.pojo.entity.FundTransaction;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,9 @@ import org.springframework.dao.DeadlockLoserDataAccessException; // 【1. 新增
 import org.springframework.retry.annotation.Backoff; // 【1. 新增】导入Backoff
 import org.springframework.retry.annotation.Retryable; // 【1. 新增】导入Retryable
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+import com.whu.hongjing.pojo.dto.RiskAssessmentSubmitDTO;
+import com.whu.hongjing.pojo.entity.Customer;
 
 /**
  * 这是一个专门用于并发写入模拟数据的辅助服务。
@@ -24,8 +28,16 @@ public class MockDataWriterService {
     @Autowired
     private CustomerHoldingService customerHoldingService;
 
+    @Autowired
+    private CustomerService customerService;
+    @Autowired
+    private RiskAssessmentService riskAssessmentService;
+
+    @Autowired
+    private FundInfoService fundInfoService;
+
     /**
-     * 【终极改造】并发写入的核心事务方法
+     * 并发写入交易数据的核心事务方法
      * 1. @Transactional: 保证每个客户的数据写入是原子性的。
      * 2. @Retryable: 赋予此方法自动重试的能力。
      * - value: 指定只有在发生“死锁”这类异常时，才进行重试。
@@ -51,4 +63,64 @@ public class MockDataWriterService {
             customerHoldingService.saveBatch(holdings);
         }
     }
+
+
+    /**
+     * 并发写入单个新客户及其初始风险评估。
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Retryable(
+        value = { DeadlockLoserDataAccessException.class },
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 50, multiplier = 2)
+    )
+    public void saveNewCustomerInTransaction(Customer customer) {
+        // 1. 保存Customer对象。
+        // 注意：调用save后，MyBatis-Plus会自动将数据库生成的自增ID回填到customer对象中。
+        customerService.save(customer);
+
+        // 2. 使用回填了ID的customer对象，创建并保存其风险评估。
+        RiskAssessmentSubmitDTO assessmentDto = new RiskAssessmentSubmitDTO();
+        assessmentDto.setCustomerId(customer.getId()); // 此处可以获取到ID
+        assessmentDto.setScore(ThreadLocalRandom.current().nextInt(101));
+        assessmentDto.setAssessmentDate(LocalDate.now().minusDays(ThreadLocalRandom.current().nextInt(365)));
+        riskAssessmentService.createAssessment(assessmentDto);
+    }
+
+
+
+    /**
+     * 在独立的、可重试的事务中，批量更新基金净值。
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Retryable(
+        value = { DeadlockLoserDataAccessException.class },
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 100, multiplier = 2)
+    )
+    public void saveUpdatedPricesInTransaction(List<FundInfo> updatedFunds) {
+        if (updatedFunds != null && !updatedFunds.isEmpty()) {
+            fundInfoService.updateBatchById(updatedFunds);
+        }
+    }
+
+    /**
+     * 在独立的、可重试的事务中，批量更新持仓市值。
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Retryable(
+        value = { DeadlockLoserDataAccessException.class },
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 100, multiplier = 2)
+    )
+    public void saveUpdatedHoldingsInTransaction(List<CustomerHolding> updatedHoldings) {
+        if (updatedHoldings != null && !updatedHoldings.isEmpty()) {
+            customerHoldingService.updateBatchById(updatedHoldings, 1000);
+        }
+    }
+
+
+
+
+
 }

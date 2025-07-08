@@ -10,6 +10,7 @@ import com.whu.hongjing.pojo.entity.FundTransaction;
 import com.whu.hongjing.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -46,48 +47,165 @@ public class MockDataServiceImpl implements MockDataService {
             "公务员", "销售经理", "市场专员", "运营专员", "自由职业者"
     };
 
+
     /**
-     * 生成客户
-     * @param customerCount
-     * @return java.lang.String
-     * @author yufei
-     * @since 2025/7/8
+     * 生成客户的总调度方法，自身不带事务。
+     * 负责协调“并发计算客户对象”和“事务性写入”两个阶段。
+     */
+    @Override
+    public String createMockCustomers(int customerCount) {
+        System.out.println("【创世】开始并行生成 " + customerCount + " 位客户的基础信息...");
+
+        // --- 第一阶段：并发计算（在内存中生成所有Customer对象） ---
+        int corePoolSize = Runtime.getRuntime().availableProcessors();
+        ThreadFactory calcThreadFactory = new ThreadFactoryBuilder().setNameFormat("customer-creator-thread-%d").build();
+        ExecutorService calcExecutor = new ThreadPoolExecutor(
+            corePoolSize,
+            corePoolSize * 10,
+            60L,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(customerCount),
+            calcThreadFactory,
+            new ThreadPoolExecutor.CallerRunsPolicy()
+        );
+
+        List<Future<Customer>> calcFutures = new ArrayList<>();
+        for (int i = 0; i < customerCount; i++) {
+            Callable<Customer> task = () -> {
+                Faker faker = new Faker(Locale.CHINA);
+                Random random = ThreadLocalRandom.current();
+                Customer customer = new Customer();
+                customer.setName(faker.name().fullName());
+                customer.setGender(random.nextBoolean() ? "男" : "女");
+                customer.setIdType("身份证");
+                customer.setIdNumber(faker.number().digits(18));
+                customer.setBirthDate(faker.date().birthday(18, 65).toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
+                customer.setNationality("中国");
+                customer.setOccupation(OCCUPATIONS[random.nextInt(OCCUPATIONS.length)]);
+                customer.setPhone(faker.phoneNumber().cellPhone());
+                String address = faker.address().state() + faker.address().city() + faker.address().streetName() +
+                        faker.address().buildingNumber() + "号";
+                customer.setAddress(address);
+                return customer;
+            };
+            calcFutures.add(calcExecutor.submit(task));
+        }
+        calcExecutor.shutdown();
+
+        // --- 第二阶段：并发写入 ---
+        ThreadFactory writerThreadFactory = new ThreadFactoryBuilder().setNameFormat("customer-writer-thread-%d").build();
+        ExecutorService writerExecutor = new ThreadPoolExecutor(
+            corePoolSize,
+                corePoolSize * 10,
+                60L,
+                TimeUnit.SECONDS,
+                new LinkedBlockingQueue<>(customerCount),
+                writerThreadFactory,
+                new ThreadPoolExecutor.CallerRunsPolicy()
+        );
+
+        List<Future<Void>> writerFutures = new ArrayList<>();
+
+                try {
+            System.out.println("【创世】等待计算任务完成，并向写入线程池提交独立的并发写入任务...");
+            for (Future<Customer> future : calcFutures) {
+                // a. 获取一个在内存中预先计算好的Customer对象
+                // 注意：由于闭包的限制，我们需要一个final或有效final的引用
+                final Customer initialCustomer = future.get();
+
+                // b. 为这个Customer对象创建一个独立的、可自我修复的写入任务
+                Callable<Void> writeTask = () -> {
+                    int maxRetries = 5; // 为防止极端情况，设置最大重试次数
+                    Customer currentCustomer = initialCustomer; // 将初始客户作为第一次尝试的对象
+
+                    for (int i = 0; i < maxRetries; i++) {
+                        try {
+                            // 尝试写入当前客户的数据
+                            mockDataWriterService.saveNewCustomerInTransaction(currentCustomer);
+                            // 如果成功，立刻跳出重试循环
+                            return null;
+                        } catch (DuplicateKeyException e) {
+                            // 【核心修复】如果捕获到的是唯一键冲突异常
+                            System.out.println("【创世-警告】线程 [" + Thread.currentThread().getName() + "] 遇到重复数据，正在尝试重新生成...");
+
+                            // 如果已经是最后一次尝试，则不再重新生成，直接向上抛出异常，让主任务失败
+                            if (i == maxRetries - 1) {
+                                System.err.println("【创世-错误】重试 " + maxRetries + " 次后依然遇到重复数据，任务失败。");
+                                throw e;
+                            }
+
+                            // 【原地重新生成】立刻创建一个全新的Customer对象，用于下一次循环尝试
+                            Faker faker = new Faker(Locale.CHINA);
+                            Random random = ThreadLocalRandom.current();
+                            currentCustomer = new Customer();
+                            currentCustomer.setName(faker.name().fullName());
+                            currentCustomer.setGender(random.nextBoolean() ? "男" : "女");
+                            currentCustomer.setIdType("身份证");
+                            currentCustomer.setIdNumber(faker.number().digits(18));
+                            currentCustomer.setBirthDate(faker.date().birthday(18, 65).toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
+                            currentCustomer.setNationality("中国");
+                            currentCustomer.setOccupation(OCCUPATIONS[random.nextInt(OCCUPATIONS.length)]);
+                            currentCustomer.setPhone(faker.phoneNumber().cellPhone());
+                            String address = faker.address().state() + faker.address().city() + faker.address().streetName() +
+                                    faker.address().buildingNumber() + "号";
+                            currentCustomer.setAddress(address);
+                        }
+                    }
+                    return null;
+                };
+                writerFutures.add(writerExecutor.submit(writeTask));
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            Thread.currentThread().interrupt();
+            return "【创世】任务失败：在并发生成客户信息时发生错误。 " + e.getMessage();
+        } finally {
+            if (!calcExecutor.isTerminated()) calcExecutor.shutdownNow();
+        }
+
+        // --- 第三阶段：检查所有并发写入任务的结果 ---
+        writerExecutor.shutdown();
+        int successCount = 0;
+        try {
+             System.out.println("【创世】所有写入任务已提交，开始逐一检查执行结果...");
+            for (Future<Void> future : writerFutures) {
+                future.get(); // 如果任何一个子任务最终失败，这里会抛出异常
+                successCount++;
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            System.err.println("【创世】严重错误：在执行并发写入时，至少有一个任务失败！");
+            e.printStackTrace();
+            Thread.currentThread().interrupt();
+            return "【创世】任务失败：并发写入数据库时发生错误，详情请查看控制台日志。";
+        } finally {
+             if (!writerExecutor.isTerminated()) writerExecutor.shutdownNow();
+        }
+
+        return "【创世】任务完成！成功创建了 " + successCount + " 位新客户及其初始风险评估。";
+    }
+
+    /**
+     * 负责将生成好的客户和风险评估数据写入数据库。
      */
     @Override
     @Transactional
-    public String createMockCustomers(int customerCount) {
-        // ... 此方法逻辑完全不变
-        Faker faker = new Faker(Locale.CHINA);
+    public void saveCustomersAndAssessmentsInTransaction(List<Customer> customersToSave) {
+        // 1. 批量保存所有客户
+        customerService.saveBatch(customersToSave, 10000); // 分批插入，每批2000条
+
+        // 2. 批量创建并保存对应的风险评估
+        // 注意：此时customersToSave列表中的每个Customer对象，在经过saveBatch后，已经被MyBatis-Plus自动填充了ID
         Random random = new Random();
-        List<Customer> customersToSave = new ArrayList<>();
-
-        for (int i = 0; i < customerCount; i++) {
-            Customer customer = new Customer();
-            customer.setName(faker.name().fullName());
-            customer.setGender(random.nextBoolean() ? "男" : "女");
-            customer.setIdType("身份证");
-            customer.setIdNumber(faker.number().digits(18));
-            customer.setBirthDate(faker.date().birthday(18, 65).toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
-            customer.setNationality("中国");
-            customer.setOccupation(OCCUPATIONS[random.nextInt(OCCUPATIONS.length)]);
-            customer.setPhone(faker.phoneNumber().cellPhone());
-            String address = faker.address().state() + faker.address().city() + faker.address().streetName() +
-                    faker.address().buildingNumber() + "号";
-            customer.setAddress(address);
-            customersToSave.add(customer);
-        }
-        customerService.saveBatch(customersToSave);
-
         for (Customer customer : customersToSave) {
             RiskAssessmentSubmitDTO assessmentDto = new RiskAssessmentSubmitDTO();
-            assessmentDto.setCustomerId(customer.getId());
+            assessmentDto.setCustomerId(customer.getId()); // 此处可以获取到自增ID
             assessmentDto.setScore(random.nextInt(101));
             assessmentDto.setAssessmentDate(LocalDate.now().minusDays(random.nextInt(365)));
             riskAssessmentService.createAssessment(assessmentDto);
         }
-
-        return "【创世】任务完成！成功创建了 " + customersToSave.size() + " 位新客户及其初始风险评估。";
+        System.out.println("【创世-数据库】所有客户及风险评估数据写入事务成功提交。");
     }
+
+
 
 
     /**
