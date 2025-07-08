@@ -1,5 +1,5 @@
 package com.whu.hongjing.controller;
-
+import com.whu.hongjing.service.ScheduledTasksService;
 import com.whu.hongjing.pojo.vo.ApiResponseVO;
 import com.whu.hongjing.service.MockDataService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,11 +12,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/mock-data")
-@Tag(name = "测试数据生成工具", description = "用于生成各类模拟数据的接口")
+@Tag(name = "测试数据生成工具", description = "用于生成和刷新各类模拟数据的接口")
 public class MockDataController {
 
     @Autowired
     private MockDataService mockDataService;
+    @Autowired
+    private ScheduledTasksService scheduledTasksService;
+
 
     @PostMapping("/create-customers")
     @Operation(summary = "【工具I：创世】生成一批全新的模拟客户及其初始风险评估")
@@ -39,6 +42,24 @@ public class MockDataController {
         } catch (Exception e) {
             e.printStackTrace();
             return new ApiResponseVO(false, "交易模拟失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 【3. 新增接口】
+     * 手动触发一次每日的基金净值更新，以及所有客户持仓市值的重新计算。
+     * 这可以让你在任何时候都看到最新的市值数据。
+     */
+    @PostMapping("/trigger-daily-update")
+    @Operation(summary = "【工具III：刷新净值】手动触发一次每日净值和市值的更新任务")
+    public ApiResponseVO triggerDailyUpdate() {
+        try {
+            // 直接调用定时任务的核心方法
+            scheduledTasksService.updateNetValueAndMarketValueDaily();
+            return new ApiResponseVO(true, "每日净值和市值更新任务已手动触发并成功执行！");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ApiResponseVO(false, "手动触发每日任务失败: " + e.getMessage());
         }
     }
 }

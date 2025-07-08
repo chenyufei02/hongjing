@@ -14,7 +14,6 @@ import java.util.List;
 @Tag(name = "客户持仓管理", description = "提供客户持仓的查询接口")
 public class CustomerHoldingController {
 
-    // TODO 还需要处理交易发生后自动更新持仓信息
     @Autowired
     private CustomerHoldingService customerHoldingService;
 

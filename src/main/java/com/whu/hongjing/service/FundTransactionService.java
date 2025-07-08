@@ -12,8 +12,8 @@ public interface FundTransactionService extends IService<FundTransaction> {
     FundTransaction createRedeemTransaction(FundRedeemDTO dto);
 
 
-    // 以上是对外发生交易的接口方法  下面是对内部进行交易数据生成的接口方法  真实场景中不需要
-    FundTransaction purchase(Long customerId, String fundCode, BigDecimal amount);
-
-    FundTransaction redeem(Long customerId, String fundCode, BigDecimal shares);
+//    // 以上是对外发生交易的接口方法  下面是对内部进行交易数据生成的接口方法  真实场景中不需要
+//    FundTransaction purchase(Long customerId, String fundCode, BigDecimal amount);
+//
+//    FundTransaction redeem(Long customerId, String fundCode, BigDecimal shares);
 }

@@ -9,10 +9,10 @@ import com.whu.hongjing.pojo.entity.FundTransaction;
 import com.whu.hongjing.service.CustomerHoldingService;
 import com.whu.hongjing.service.FundTransactionService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.whu.hongjing.pojo.entity.FundInfo; // 导入
-import com.whu.hongjing.service.FundInfoService; // 导入
+import com.whu.hongjing.service.FundInfoService;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.math.BigDecimal;
@@ -25,7 +25,9 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
 
     @Autowired
     private FundTransactionService fundTransactionService;
-
+    @Autowired
+    @Lazy
+    private CustomerHoldingService self;
     @Autowired
     private FundInfoService fundInfoService;
 
@@ -174,20 +176,6 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
         this.saveOrUpdate(holding);
     }
 
-    @Override
-    public BigDecimal getHoldingShares(Long customerId, String fundCode) {
-        QueryWrapper<CustomerHolding> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("customer_id", customerId)
-                    .eq("fund_code", fundCode);
-
-        CustomerHolding holding = this.getOne(queryWrapper);
-
-        if (holding != null && holding.getTotalShares() != null) {
-            return holding.getTotalShares();
-        }
-
-        return BigDecimal.ZERO; // 如果找不到持仓记录，或份额为空，则返回0
-    }
 
     @Override
     public void recalculateAllMarketValues() {
@@ -213,7 +201,7 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
         }
 
         // 4. 将更新后的所有持仓数据，批量写回数据库
-        this.updateBatchById(allHoldings);
+         self.updateBatchById(allHoldings);
         System.out.println("【批量任务】(全量版) 成功更新了 " + allHoldings.size() + " 条持仓记录的最新市值。");
     }
 }

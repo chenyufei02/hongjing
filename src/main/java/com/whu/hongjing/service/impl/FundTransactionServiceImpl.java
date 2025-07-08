@@ -127,28 +127,28 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
 
 
 
-    // 这里两个是为了只根据几个简单的信息快速生成交易数据使用的 避免每次生成交易数据都需要接收完整的DTO
-    @Override
-    public FundTransaction purchase(Long customerId, String fundCode, BigDecimal amount) {
-        // 复用我们之前写好的、更专业的逻辑
-        FundPurchaseDTO dto = new FundPurchaseDTO();
-        dto.setCustomerId(customerId);
-        dto.setFundCode(fundCode);
-        dto.setTransactionAmount(amount);
-        dto.setTransactionTime(LocalDateTime.now());
-        return this.createPurchaseTransaction(dto);
-    }
-
-    @Override
-    public FundTransaction redeem(Long customerId, String fundCode, BigDecimal shares) {
-        // 复用我们之前写好的、更专业的逻辑
-        FundRedeemDTO dto = new FundRedeemDTO();
-        dto.setCustomerId(customerId);
-        dto.setFundCode(fundCode);
-        dto.setTransactionShares(shares);
-        dto.setTransactionTime(LocalDateTime.now());
-        return this.createRedeemTransaction(dto);
-    }
+//    // 这里两个是为了只根据几个简单的信息快速生成交易数据使用的 避免每次生成交易数据都需要接收完整的DTO
+//    @Override
+//    public FundTransaction purchase(Long customerId, String fundCode, BigDecimal amount) {
+//        // 复用我们之前写好的、更专业的逻辑
+//        FundPurchaseDTO dto = new FundPurchaseDTO();
+//        dto.setCustomerId(customerId);
+//        dto.setFundCode(fundCode);
+//        dto.setTransactionAmount(amount);
+//        dto.setTransactionTime(LocalDateTime.now());
+//        return this.createPurchaseTransaction(dto);
+//    }
+//
+//    @Override
+//    public FundTransaction redeem(Long customerId, String fundCode, BigDecimal shares) {
+//        // 复用我们之前写好的、更专业的逻辑
+//        FundRedeemDTO dto = new FundRedeemDTO();
+//        dto.setCustomerId(customerId);
+//        dto.setFundCode(fundCode);
+//        dto.setTransactionShares(shares);
+//        dto.setTransactionTime(LocalDateTime.now());
+//        return this.createRedeemTransaction(dto);
+//    }
 
 
 

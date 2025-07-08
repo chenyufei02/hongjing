@@ -10,4 +10,5 @@ public interface MockDataService {
      * 【工具II：演绎】
      */
     String simulateTradingDays(int days);
+
 }
