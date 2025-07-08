@@ -23,7 +23,7 @@ public class RiskAssessment {
     // 风险得分
     private Integer riskScore;
 
-    // 风险等级
+    // 申报风险等级
     private String riskLevel;
 
     // 评估日期

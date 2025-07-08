@@ -62,7 +62,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         return super.save(entity);
     }
 
-        @Override
+    @Override
     public List<Customer> getCustomersByTag(String tagName) {
         // 1. 先从标签关系表中，找到所有拥有该标签的 customer_id
         QueryWrapper<CustomerTagRelation> tagQuery = new QueryWrapper<>();

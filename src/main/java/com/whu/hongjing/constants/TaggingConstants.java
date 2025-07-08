@@ -30,17 +30,26 @@ public final class TaggingConstants {
     public static final int RECENCY_STAGNANT_MONTHS = 3; // 投入停滞
     public static final int RECENCY_OUTFLOW_MONTHS = 6;  // 资产流出
 
+    // 实盘风险分数的阈值 (与 fund_info.risk_score 对应)
+    public static final double ACTUAL_RISK_THRESHOLD_AGGRESSIVE = 4.5; // 激进型
+    public static final double ACTUAL_RISK_THRESHOLD_GROWTH = 3.5;     // 成长型
+    public static final double ACTUAL_RISK_THRESHOLD_BALANCED = 2.5;   // 平衡型
+    public static final double ACTUAL_RISK_THRESHOLD_STEADY = 1.5;     // 稳健型
 
     // --- 2. 标签分类 (Categories) ---
-    public static final String CATEGORY_ASSET = "资产规模";
+    public static final String CATEGORY_ASSET = "资产规模M";
     public static final String CATEGORY_STYLE = "持仓风格";
-    public static final String CATEGORY_RECENCY = "近期活跃度";
-    public static final String CATEGORY_FREQUENCY = "历史习惯";
+    public static final String CATEGORY_RECENCY = "近期活跃度R";
+    public static final String CATEGORY_FREQUENCY = "交易频率F";
     public static final String CATEGORY_GENDER = "性别";
     public static final String CATEGORY_OCCUPATION = "职业";
     public static final String CATEGORY_AGE = "年龄分代";
     public static final String CATEGORY_RISK_DECLARED = "申报风险等级";
     public static final String CATEGORY_INVESTMENT_BEHAVIOR = "投资表现";
+    public static final String CATEGORY_RISK_ACTUAL = "实盘风险等级";
+    public static final String CATEGORY_RISK_DIAGNOSIS = "风险诊断结果";
+
+
 
 
     // --- 3. 标签文本 (Labels) ---
@@ -72,6 +81,22 @@ public final class TaggingConstants {
     // 长期持有型 - 历史习惯(F)标签
     public static final String LABEL_FREQUENCY_LONG_REGULAR = "习惯: 有定投行为";
     public static final String LABEL_FREQUENCY_LONG_IRREGULAR = "习惯: 无定投行为";
+
+    // 实盘风险等级标签
+    public static final String LABEL_ACTUAL_RISK_AGGRESSIVE = "实盘-激进型";
+    public static final String LABEL_ACTUAL_RISK_GROWTH = "实盘-成长型";
+    public static final String LABEL_ACTUAL_RISK_BALANCED = "实盘-平衡型";
+    public static final String LABEL_ACTUAL_RISK_STEADY = "实盘-稳健型";
+    public static final String LABEL_ACTUAL_RISK_CONSERVATIVE = "实盘-保守型";
+    public static final String LABEL_ACTUAL_RISK_UNKNOWN = "实盘-无法评估";
+
+    // 【新增】风险诊断标签
+    public static final String LABEL_DIAGNOSIS_MATCH = "风险匹配";
+    public static final String LABEL_DIAGNOSIS_OVERWEIGHT = "风险超配";
+    public static final String LABEL_DIAGNOSIS_UNDERWEIGHT = "风险偏好保守";
+    public static final String LABEL_DIAGNOSIS_UNKNOWN = "诊断-无法评估";
+
+
 
     /**
      * 私有构造函数，防止该常量类被外部实例化。

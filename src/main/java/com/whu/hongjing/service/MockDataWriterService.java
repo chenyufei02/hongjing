@@ -2,7 +2,6 @@ package com.whu.hongjing.service;
 import java.time.LocalDate;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.whu.hongjing.pojo.entity.CustomerHolding;
-import com.whu.hongjing.pojo.entity.FundInfo;
 import com.whu.hongjing.pojo.entity.FundTransaction;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -32,9 +31,6 @@ public class MockDataWriterService {
     private CustomerService customerService;
     @Autowired
     private RiskAssessmentService riskAssessmentService;
-
-    @Autowired
-    private FundInfoService fundInfoService;
 
     /**
      * 并发写入交易数据的核心事务方法
@@ -86,41 +82,5 @@ public class MockDataWriterService {
         assessmentDto.setAssessmentDate(LocalDate.now().minusDays(ThreadLocalRandom.current().nextInt(365)));
         riskAssessmentService.createAssessment(assessmentDto);
     }
-
-
-
-    /**
-     * 在独立的、可重试的事务中，批量更新基金净值。
-     */
-    @Transactional(isolation = Isolation.READ_COMMITTED)
-    @Retryable(
-        value = { DeadlockLoserDataAccessException.class },
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 100, multiplier = 2)
-    )
-    public void saveUpdatedPricesInTransaction(List<FundInfo> updatedFunds) {
-        if (updatedFunds != null && !updatedFunds.isEmpty()) {
-            fundInfoService.updateBatchById(updatedFunds);
-        }
-    }
-
-    /**
-     * 在独立的、可重试的事务中，批量更新持仓市值。
-     */
-    @Transactional(isolation = Isolation.READ_COMMITTED)
-    @Retryable(
-        value = { DeadlockLoserDataAccessException.class },
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 100, multiplier = 2)
-    )
-    public void saveUpdatedHoldingsInTransaction(List<CustomerHolding> updatedHoldings) {
-        if (updatedHoldings != null && !updatedHoldings.isEmpty()) {
-            customerHoldingService.updateBatchById(updatedHoldings, 1000);
-        }
-    }
-
-
-
-
 
 }

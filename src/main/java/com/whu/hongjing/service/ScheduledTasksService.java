@@ -46,7 +46,7 @@ public class ScheduledTasksService {
         // --- 第二阶段：并发更新所有持仓的市值 ---
         this.updateMarketValuesConcurrently();
 
-        System.out.println("【定时任务】每日净值与市值更新任务圆满完成！");
+        System.out.println("【定时任务】每日净值与市值更新任务圆满完成！且已成功更新用户持仓表！");
     }
 
 

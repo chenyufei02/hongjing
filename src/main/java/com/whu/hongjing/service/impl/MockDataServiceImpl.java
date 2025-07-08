@@ -2,20 +2,17 @@ package com.whu.hongjing.service.impl;
 
 import com.github.javafaker.Faker;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.whu.hongjing.pojo.dto.RiskAssessmentSubmitDTO;
 import com.whu.hongjing.pojo.entity.Customer;
 import com.whu.hongjing.pojo.entity.CustomerHolding;
 import com.whu.hongjing.pojo.entity.FundInfo;
 import com.whu.hongjing.pojo.entity.FundTransaction;
 import com.whu.hongjing.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
@@ -24,7 +21,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * V5 最终版：交易模拟采用手动管理的线程池实现，并通过“计算/IO分离”模型解决事务传递问题，实现极致性能与稳定性。
+ * 交易模拟采用手动管理的线程池实现，并通过“计算/IO分离”模型解决事务传递问题，实现极致性能与稳定性。
  */
 @Service
 public class MockDataServiceImpl implements MockDataService {
@@ -33,11 +30,6 @@ public class MockDataServiceImpl implements MockDataService {
     private FundInfoService fundInfoService;
     @Autowired
     private CustomerService customerService;
-    @Autowired
-    private RiskAssessmentService riskAssessmentService;
-    @Autowired
-    @Lazy
-    private TagRefreshService tagRefreshService;
     @Autowired
     private MockDataWriterService mockDataWriterService;
 
@@ -120,7 +112,7 @@ public class MockDataServiceImpl implements MockDataService {
 
                     for (int i = 0; i < maxRetries; i++) {
                         try {
-                            // 尝试写入当前客户的数据
+                            // 尝试写入当前客户的数据 【同时在这里自动生成和写入当前客户的风险评估数据！！！】
                             mockDataWriterService.saveNewCustomerInTransaction(currentCustomer);
                             // 如果成功，立刻跳出重试循环
                             return null;
@@ -182,30 +174,6 @@ public class MockDataServiceImpl implements MockDataService {
 
         return "【创世】任务完成！成功创建了 " + successCount + " 位新客户及其初始风险评估。";
     }
-
-    /**
-     * 负责将生成好的客户和风险评估数据写入数据库。
-     */
-    @Override
-    @Transactional
-    public void saveCustomersAndAssessmentsInTransaction(List<Customer> customersToSave) {
-        // 1. 批量保存所有客户
-        customerService.saveBatch(customersToSave, 10000); // 分批插入，每批2000条
-
-        // 2. 批量创建并保存对应的风险评估
-        // 注意：此时customersToSave列表中的每个Customer对象，在经过saveBatch后，已经被MyBatis-Plus自动填充了ID
-        Random random = new Random();
-        for (Customer customer : customersToSave) {
-            RiskAssessmentSubmitDTO assessmentDto = new RiskAssessmentSubmitDTO();
-            assessmentDto.setCustomerId(customer.getId()); // 此处可以获取到自增ID
-            assessmentDto.setScore(random.nextInt(101));
-            assessmentDto.setAssessmentDate(LocalDate.now().minusDays(random.nextInt(365)));
-            riskAssessmentService.createAssessment(assessmentDto);
-        }
-        System.out.println("【创世-数据库】所有客户及风险评估数据写入事务成功提交。");
-    }
-
-
 
 
     /**
@@ -283,7 +251,7 @@ public class MockDataServiceImpl implements MockDataService {
 
                      // 开始进行申购操作
                      if (isPurchase) {
-                         BigDecimal purchaseAmount = new BigDecimal(500 + random.nextInt(30000)); // 随机购买金额
+                         BigDecimal purchaseAmount = new BigDecimal(500 + random.nextInt(20000)); // 随机购买金额
                          BigDecimal purchaseShares = purchaseAmount.divide(netValue, 2, RoundingMode.DOWN); // 确认购买份额（模拟 采用前一天的收盘价）
                          // 保存交易据
                          customerTransactions.add(createTransaction(customer.getId(), targetFund, "申购", purchaseAmount, purchaseShares, netValue, transactionTime));
@@ -398,16 +366,7 @@ public class MockDataServiceImpl implements MockDataService {
              if (!writerExecutor.isTerminated()) writerExecutor.shutdownNow();
         }
 
-
-        // --- 4. 触发独立的标签刷新任务 ---
-        System.out.println("【演绎-步骤3】数据已成功提交，开始调用独立的画像刷新服务...");
-        try {
-            tagRefreshService.refreshAllTagsAtomically();
-        } catch (Exception e) {
-            System.err.println("【演绎】调用全量画像刷新服务时发生异常: " + e.getMessage());
-            e.printStackTrace();
-        }
-        return "【演绎】任务完成！数据模拟和画像刷新均已触发。";
+        return "【演绎】任务完成！成功模拟并保存了交易数据。请更新市值并刷新客户标签。";
     }
 
     // createTransaction 辅助方法保持不变

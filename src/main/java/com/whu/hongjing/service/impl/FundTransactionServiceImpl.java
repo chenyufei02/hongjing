@@ -18,11 +18,9 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
-import com.whu.hongjing.service.TagRefreshService; // 【新增】导入TagRefreshService
-import org.springframework.beans.factory.annotation.Autowired;
+import com.whu.hongjing.service.TagRefreshService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
 
 /**
  * 基金交易服务实现类
@@ -124,33 +122,6 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
         // 5. 保存交易并触发持仓更新
         return saveTransactionAndUpdateHolding(transaction);
     }
-
-
-
-//    // 这里两个是为了只根据几个简单的信息快速生成交易数据使用的 避免每次生成交易数据都需要接收完整的DTO
-//    @Override
-//    public FundTransaction purchase(Long customerId, String fundCode, BigDecimal amount) {
-//        // 复用我们之前写好的、更专业的逻辑
-//        FundPurchaseDTO dto = new FundPurchaseDTO();
-//        dto.setCustomerId(customerId);
-//        dto.setFundCode(fundCode);
-//        dto.setTransactionAmount(amount);
-//        dto.setTransactionTime(LocalDateTime.now());
-//        return this.createPurchaseTransaction(dto);
-//    }
-//
-//    @Override
-//    public FundTransaction redeem(Long customerId, String fundCode, BigDecimal shares) {
-//        // 复用我们之前写好的、更专业的逻辑
-//        FundRedeemDTO dto = new FundRedeemDTO();
-//        dto.setCustomerId(customerId);
-//        dto.setFundCode(fundCode);
-//        dto.setTransactionShares(shares);
-//        dto.setTransactionTime(LocalDateTime.now());
-//        return this.createRedeemTransaction(dto);
-//    }
-
-
 
 
     /**

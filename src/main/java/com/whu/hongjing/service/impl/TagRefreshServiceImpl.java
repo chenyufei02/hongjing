@@ -10,13 +10,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.stream.Collectors;import org.springframework.context.annotation.Lazy;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import org.springframework.context.annotation.Lazy;
+import com.whu.hongjing.service.FundInfoService;
 
 /**
  * 客户画像刷新服务的核心实现类。
@@ -39,6 +43,8 @@ public class TagRefreshServiceImpl implements TagRefreshService {
     private CustomerProfileService customerProfileService;
     @Autowired
     private CustomerTagRelationService customerTagRelationService;
+    @Autowired
+    private FundInfoService fundInfoService;
     @Autowired
     @Lazy
     private TagRefreshService self;
@@ -93,7 +99,7 @@ public class TagRefreshServiceImpl implements TagRefreshService {
             Thread.currentThread().interrupt();
         }
 
-        System.out.println("【批量刷新完成】所有客户画像数据更新任务已完成！");
+        System.out.println("【批量刷新完成】所有客户指标数据生成及画像标签更新任务已完成！");
     }
 
 
@@ -115,13 +121,18 @@ public class TagRefreshServiceImpl implements TagRefreshService {
         RiskAssessment latestAssessment = riskAssessmentService.getOne(
                 new QueryWrapper<RiskAssessment>().eq("customer_id", customer.getId()).orderByDesc("assessment_date").last("LIMIT 1"));
 
+        // 准备基金风险数据，用于计算实盘风险
+        Map<String, FundInfo> fundInfoMap = fundInfoService.list().stream()
+                .collect(Collectors.toMap(FundInfo::getFundCode, Function.identity()));
+
+
 
 
         // --- 计算阶段1：更新核心量化指标 (CustomerProfile) ： 持仓周期 总资产M 最近交易距离R 交易频率F---
         CustomerProfile profile = calculateAndSaveProfile(customer, holdings, transactions);
 
         // --- 计算阶段2：根据最新的指标和基础信息，生成所有分类标签 ：包含分类标签与指标标签 ---
-        List<CustomerTagRelation> newTags = generateAllTags(customer, profile, latestAssessment, transactions);
+        List<CustomerTagRelation> newTags = generateAllTags(customer, profile, latestAssessment, transactions, holdings, fundInfoMap);
 
         // --- 持久化阶段：将新标签覆盖式写入数据库 ---
         customerTagRelationService.remove(new QueryWrapper<CustomerTagRelation>().eq("customer_id", customerId));
@@ -197,9 +208,13 @@ public class TagRefreshServiceImpl implements TagRefreshService {
     }
 
     /**
-     * 核心标签生成器：根据所有输入信息，产出完整的标签列表。
+     * 核心标签生成器：根据所有输入信息，产出完整的标签列表。包括：性别 职业 年龄 申报风险 实盘风险 风险诊断 M R F
      */
-    private List<CustomerTagRelation> generateAllTags(Customer customer, CustomerProfile profile, RiskAssessment assessment, List<FundTransaction> transactions) {
+    private List<CustomerTagRelation> generateAllTags(
+            Customer customer, CustomerProfile profile,
+             RiskAssessment assessment, List<FundTransaction> transactions,
+            List<CustomerHolding> holdings, Map<String, FundInfo> fundInfoMap)
+    {
         List<CustomerTagRelation> tags = new ArrayList<>();
         Long customerId = customer.getId();
 
@@ -207,8 +222,14 @@ public class TagRefreshServiceImpl implements TagRefreshService {
         if (customer.getGender() != null) tags.add(new CustomerTagRelation(customerId, customer.getGender(), TaggingConstants.CATEGORY_GENDER));
         if (customer.getOccupation() != null) tags.add(new CustomerTagRelation(customerId, customer.getOccupation(), TaggingConstants.CATEGORY_OCCUPATION));
         if (customer.getBirthDate() != null) tags.add(new CustomerTagRelation(customerId, getAgeGroupTag(customer.getBirthDate()), TaggingConstants.CATEGORY_AGE));
-        String riskLevel = (assessment != null && assessment.getRiskLevel() != null) ? assessment.getRiskLevel() : "未知";
-        tags.add(new CustomerTagRelation(customerId, riskLevel, TaggingConstants.CATEGORY_RISK_DECLARED));
+
+        // 1.5 获取申报风险等级，获取实盘风险和风险诊断标签（暂时保存在内存）
+        String declaredRiskLevel = (assessment != null && assessment.getRiskLevel() != null) ? assessment.getRiskLevel() : "未知";
+        tags.add(new CustomerTagRelation(customerId, declaredRiskLevel, TaggingConstants.CATEGORY_RISK_DECLARED));
+
+            // 计算并生成实盘风险和风险诊断标签
+        tags.addAll(calculateAndGenerateRiskTags(customerId, holdings, fundInfoMap, declaredRiskLevel));
+
 
         // 2. 生成资产规模 (M) 标签
         if (profile.getTotalMarketValue() != null) {
@@ -231,6 +252,7 @@ public class TagRefreshServiceImpl implements TagRefreshService {
         }
 
         // 4. 根据风格，生成不同的 R 和 F 标签
+            // -- 如果是长持型客户 的 R 和 F --
         if (isLongTermHolder) {
             // -- 长期持有型客户的 R 和 F --
             // R: 行为标签 (根据净申购判断)
@@ -239,7 +261,7 @@ public class TagRefreshServiceImpl implements TagRefreshService {
             String freqTag = profile.getHasRegularInvestment() ? TaggingConstants.LABEL_FREQUENCY_LONG_REGULAR : TaggingConstants.LABEL_FREQUENCY_LONG_IRREGULAR;
             tags.add(new CustomerTagRelation(customerId, freqTag, TaggingConstants.CATEGORY_FREQUENCY));
         } else {
-            // -- 短期交易型客户的 R 和 F --
+            // -- 如果是交易型客户的 R 和 F --
             // R: 行为标签 (根据最近交易天数判断)
             if (profile.getRecencyDays() != null) {
                 int rDays = profile.getRecencyDays();
@@ -267,6 +289,87 @@ public class TagRefreshServiceImpl implements TagRefreshService {
         return tags;
     }
 
+
+    /**
+     * 计算实盘风险和风险诊断标签
+     */
+    private List<CustomerTagRelation> calculateAndGenerateRiskTags(Long customerId, List<CustomerHolding> holdings, Map<String, FundInfo> fundInfoMap, String declaredRiskLevel) {
+        List<CustomerTagRelation> riskTags = new ArrayList<>();
+
+        if (holdings == null || holdings.isEmpty() || fundInfoMap.isEmpty()) {
+            riskTags.add(new CustomerTagRelation(customerId, TaggingConstants.LABEL_ACTUAL_RISK_UNKNOWN, TaggingConstants.CATEGORY_RISK_ACTUAL));
+            riskTags.add(new CustomerTagRelation(customerId, TaggingConstants.LABEL_DIAGNOSIS_UNKNOWN, TaggingConstants.CATEGORY_RISK_DIAGNOSIS));
+            return riskTags;
+        }
+
+        BigDecimal totalMarketValue = holdings.stream()
+                .map(CustomerHolding::getMarketValue)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (totalMarketValue.compareTo(BigDecimal.ZERO) <= 0) {
+            riskTags.add(new CustomerTagRelation(customerId, TaggingConstants.LABEL_ACTUAL_RISK_UNKNOWN, TaggingConstants.CATEGORY_RISK_ACTUAL));
+            riskTags.add(new CustomerTagRelation(customerId, TaggingConstants.LABEL_DIAGNOSIS_UNKNOWN, TaggingConstants.CATEGORY_RISK_DIAGNOSIS));
+            return riskTags;
+        }
+
+        // 1. 计算加权平均风险分
+        BigDecimal weightedRiskSum = BigDecimal.ZERO;
+        for (CustomerHolding holding : holdings) {
+            FundInfo fund = fundInfoMap.get(holding.getFundCode());
+            if (fund != null && fund.getRiskScore() != null && holding.getMarketValue() != null) {
+                BigDecimal fundRisk = new BigDecimal(fund.getRiskScore());
+                weightedRiskSum = weightedRiskSum.add(holding.getMarketValue().multiply(fundRisk));
+            }
+        }
+        double actualRiskScore = weightedRiskSum.divide(totalMarketValue, 2, RoundingMode.HALF_UP).doubleValue();
+
+        // 2. 生成实盘风险标签
+        String actualRiskLabel = TaggingConstants.LABEL_ACTUAL_RISK_UNKNOWN;
+        if (actualRiskScore >= TaggingConstants.ACTUAL_RISK_THRESHOLD_AGGRESSIVE) {
+            actualRiskLabel = TaggingConstants.LABEL_ACTUAL_RISK_AGGRESSIVE;
+        } else if (actualRiskScore >= TaggingConstants.ACTUAL_RISK_THRESHOLD_GROWTH) {
+            actualRiskLabel = TaggingConstants.LABEL_ACTUAL_RISK_GROWTH;
+        } else if (actualRiskScore >= TaggingConstants.ACTUAL_RISK_THRESHOLD_BALANCED) {
+            actualRiskLabel = TaggingConstants.LABEL_ACTUAL_RISK_BALANCED;
+        } else if (actualRiskScore >= TaggingConstants.ACTUAL_RISK_THRESHOLD_STEADY) {
+            actualRiskLabel = TaggingConstants.LABEL_ACTUAL_RISK_STEADY;
+        } else if (actualRiskScore >0 && actualRiskScore < TaggingConstants.ACTUAL_RISK_THRESHOLD_STEADY){
+            actualRiskLabel = TaggingConstants.LABEL_ACTUAL_RISK_CONSERVATIVE;
+        }
+        riskTags.add(new CustomerTagRelation(customerId, actualRiskLabel, TaggingConstants.CATEGORY_RISK_ACTUAL));
+
+
+        // 3. 生成风险诊断标签
+        String diagnosisLabel = TaggingConstants.LABEL_DIAGNOSIS_UNKNOWN;
+        if (!"未知".equals(declaredRiskLevel) && !TaggingConstants.LABEL_ACTUAL_RISK_UNKNOWN.equals(actualRiskLabel)) {
+            // 为了比较，我们给风险等级赋予数值
+            Map<String, Integer> riskLevelMap = Map.of(
+                    "保守型", 1, TaggingConstants.LABEL_ACTUAL_RISK_CONSERVATIVE, 1,
+                    "稳健型", 2, TaggingConstants.LABEL_ACTUAL_RISK_STEADY, 2,
+                    "平衡型", 3, TaggingConstants.LABEL_ACTUAL_RISK_BALANCED, 3,
+                    "成长型", 4, TaggingConstants.LABEL_ACTUAL_RISK_GROWTH, 4,
+                    "激进型", 5, TaggingConstants.LABEL_ACTUAL_RISK_AGGRESSIVE, 5
+            );
+
+            int declaredLevelInt = riskLevelMap.getOrDefault(declaredRiskLevel, 0);
+            int actualLevelInt = riskLevelMap.getOrDefault(actualRiskLabel, 0);
+
+            if (declaredLevelInt > 0 && actualLevelInt > 0) {
+                if (actualLevelInt > declaredLevelInt) {
+                    diagnosisLabel = TaggingConstants.LABEL_DIAGNOSIS_OVERWEIGHT;
+                } else if (actualLevelInt < declaredLevelInt) {
+                    diagnosisLabel = TaggingConstants.LABEL_DIAGNOSIS_UNDERWEIGHT;
+                } else {
+                    diagnosisLabel = TaggingConstants.LABEL_DIAGNOSIS_MATCH;
+                }
+            }
+        }
+        riskTags.add(new CustomerTagRelation(customerId, diagnosisLabel, TaggingConstants.CATEGORY_RISK_DIAGNOSIS));
+
+        return riskTags;
+    }
+
     /**
      * 为“长期持有型”客户生成“近期活跃度(R)”标签。
      * 逻辑：通过即时计算近期的净申购额来判断。
@@ -291,7 +394,7 @@ public class TagRefreshServiceImpl implements TagRefreshService {
     }
 
     /**
-     * 辅助方法：计算指定时间范围内的净申购额（总申购 - 总赎回）。
+     * 辅助方法：计算指定时间范围内的净申购额（总申购 - 总赎回） 。
      */
     private BigDecimal calculateNetPurchase(List<FundTransaction> transactions, LocalDateTime start, LocalDateTime end) {
         BigDecimal totalPurchase = transactions.stream()
