@@ -6,6 +6,8 @@ import lombok.Data;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import java.time.LocalDate;
+import org.springframework.format.annotation.DateTimeFormat;
+import javax.validation.constraints.Pattern;
 
 /**
  * 客户新增 DTO
@@ -27,11 +29,13 @@ public class CustomerDTO {
     private String idType;
 
     @NotBlank(message = "证件号码不能为空")
+    @Pattern(regexp = "^(\\d{18}|\\d{17}(\\d|X|x))$", message = "身份证号码格式不正确")
     @Schema(description = "证件号码", example = "123456789012345678")
     private String idNumber;
 
     @NotNull(message = "出生日期不能为空")
     @Schema(description = "出生日期", example = "1990-01-01")
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate birthDate;
 
     @NotBlank(message = "国籍不能为空")
@@ -43,6 +47,7 @@ public class CustomerDTO {
     private String occupation;
 
     @NotBlank(message = "手机号不能为空")
+    @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号码格式不正确")
     @Schema(description = "手机号", example = "13800138000")
     private String phone;
 

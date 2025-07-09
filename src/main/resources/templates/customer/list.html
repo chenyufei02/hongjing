@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <th:block th:replace="~{layout :: common_head('客户管理', ~{})}" />
+</head>
+
+<body>
+
+<div th:replace="~{layout :: navbar}"></div>
+<div th:replace="~{layout :: sidebar(${activeUri})}"></div>
+
+<div class="main-content">
+    <div class="container-fluid">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="h4">客户列表</h2>
+            <div>
+                 <a th:href="@{/customer/add}" class="btn btn-warning">新增客户</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <table class="table table-hover align-middle">
+                    <thead>
+                    <tr>
+                        <th>客户ID</th>
+                        <th>姓名</th>
+                        <th>性别</th>
+                        <th>证件号码</th>
+                        <th>手机号</th>
+                        <th>职业</th>
+                        <th class="text-center">操作</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:if="${not #lists.isEmpty(customerPage.records)}" th:each="customer : ${customerPage.records}">
+                        <td th:text="${customer.id}">99</td>
+                        <td th:text="${customer.name}">张三</td>
+                        <td th:text="${customer.gender}">男</td>
+                        <td th:text="${customer.idNumber}">4201...</td>
+                        <td th:text="${customer.phone}">138****0000</td>
+                        <td th:text="${customer.occupation}">软件工程师</td>
+                        <td class="text-center">
+                            <a th:href="@{/customer/detail/{id}(id=${customer.id})}" class="btn btn-sm btn-outline-primary">详情</a>
+                            <a th:href="@{/customer/edit/{id}(id=${customer.id})}" class="btn btn-sm btn-outline-warning">编辑</a>
+                            <a href="javascript:void(0);"
+                               th:data-id="${customer.id}"
+                               th:data-name="${customer.name}"
+                               onclick="showDeleteModal(this)"
+                               class="btn btn-sm btn-outline-danger">删除</a>
+                        </td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(customerPage.records)}">
+                        <td colspan="7" class="text-center p-4">暂无客户数据</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div th:if="${customerPage.pages > 0}" class="card-footer d-flex justify-content-center align-items-center">
+                <nav aria-label="Page navigation" th:if="${customerPage.pages > 1}">
+                    <ul class="pagination mb-0">
+                        <li class="page-item" th:classappend="${customerPage.current == 1} ? 'disabled'">
+                            <a class="page-link" th:href="@{/customer/list(page=${customerPage.current - 1}, size=${customerPage.size})}">&laquo;</a>
+                        </li>
+                        <li class="page-item" th:each="pageNum : ${#numbers.sequence(startPage, endPage)}" th:classappend="${pageNum == customerPage.current} ? 'active'">
+                            <a class="page-link" th:href="@{/customer/list(page=${pageNum}, size=${customerPage.size})}" th:text="${pageNum}"></a>
+                        </li>
+                        <li class="page-item" th:classappend="${customerPage.current == customerPage.pages} ? 'disabled'">
+                             <a class="page-link" th:href="@{/customer/list(page=${customerPage.current + 1}, size=${customerPage.size})}">&raquo;</a>
+                        </li>
+                    </ul>
+                </nav>
+                <div class="ms-3 d-flex align-items-center" style="font-size: 0.9rem;">
+                    <span>共 <span th:text="${customerPage.pages}">0</span> 页，</span>
+                    <span class="ms-2">到第</span>
+                    <input type="number" class="form-control form-control-sm mx-1" style="width: 60px;" id="page-jump-input">
+                    <span>页</span>
+                    <button class="btn btn-sm btn-primary ms-1" type="button" id="page-jump-button">确定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalLabel">提醒：</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="deleteModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteButton">确认删除</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:inline="javascript">
+    /* <![CDATA[ */
+    document.addEventListener('DOMContentLoaded', function() {
+        const jumpButton = document.getElementById('page-jump-button');
+        if (jumpButton) {
+            jumpButton.addEventListener('click', function() {
+                const input = document.getElementById('page-jump-input');
+                const pageNum = parseInt(input.value, 10);
+                const totalPages = /*[[${customerPage.pages}]]*/ 0;
+                const pageSize = /*[[${customerPage.size}]]*/ 10;
+                if (isNaN(pageNum) || pageNum < 1 || pageNum > totalPages) {
+                    alert('请输入一个有效的页码 (1 - ' + totalPages + ')');
+                    return;
+                }
+                const baseUrl = /*[[@{/customer/list}]]*/ '/customer/list';
+                window.location.href = baseUrl + '?page=' + pageNum + '&size=' + pageSize;
+            });
+        }
+
+        const deleteModalElement = document.getElementById('deleteConfirmModal');
+        const deleteModal = new bootstrap.Modal(deleteModalElement, {});
+        const confirmDeleteBtn = document.getElementById('confirmDeleteButton');
+        let customerIdToDelete = null;
+
+        window.showDeleteModal = function(element) {
+            const id = element.dataset.id;
+            const name = element.dataset.name;
+            customerIdToDelete = id;
+            const modalBody = document.getElementById('deleteModalBody');
+            modalBody.textContent = '您确定要删除客户 “' + name + '” 吗？此操作不可撤销！';
+            deleteModal.show();
+        };
+
+        confirmDeleteBtn.addEventListener('click', function() {
+            if (customerIdToDelete) {
+                const form = document.createElement('form');
+                form.method = 'post';
+                form.action = '/customer/delete/' + customerIdToDelete;
+                document.body.appendChild(form);
+                form.submit();
+                document.body.removeChild(form);
+            }
+        });
+    });
+    /* ]]> */
+</script>
+
+</body>
+</html>

@@ -1,0 +1,54 @@
+/* 全局样式 */
+body {
+    background-color: #f3f4f7; /* 设置一个浅灰色的背景，模仿瑞吉外卖的风格 */
+}
+
+/* 顶部导航栏样式 */
+.navbar-top {
+    background-color: #ffc100; /* 瑞吉外卖的标志性黄色 */
+    color: #333;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 60px; /* 设置一个固定的高度 */
+    z-index: 1030; /* 确保它在最上层 */
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+}
+
+/* 侧边栏样式 */
+.sidebar {
+    background-color: #343a40;
+    position: fixed;
+    top: 60px; /* 从顶部导航栏下方开始 */
+    left: 0;
+    bottom: 0;
+    width: 240px;
+    padding: 15px;
+    z-index: 1020;
+}
+
+.sidebar .nav-link {
+    color: #bfcbd9; /* 侧边栏文字颜色 */
+}
+
+.sidebar .nav-link:hover, .sidebar .nav-link.active {
+    background-color: #495057;
+    color: white;
+}
+
+/* 主内容区样式 */
+.main-content {
+    margin-top: 60px; /* 为顶部导航栏留出空间 */
+    margin-left: 240px; /* 为侧边栏留出空间 */
+    padding: 20px;
+}
+
+/* 美化表格 */
+.table {
+    background-color: #fff; /* 表格使用白色背景 */
+    border-radius: 4px; /* 轻微的圆角 */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* 添加一点阴影，更有质感 */
+}

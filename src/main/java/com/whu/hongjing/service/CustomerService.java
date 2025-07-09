@@ -1,5 +1,6 @@
 package com.whu.hongjing.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.whu.hongjing.pojo.entity.Customer;
 import java.util.List;
@@ -11,7 +12,8 @@ public interface CustomerService extends IService<Customer>{
 
     Customer getCustomerById(Long id);
 
-    List<Customer> getAllCustomers();
+    // 分页显示和查询客户的方法
+    Page<Customer> getCustomerPage(Page<Customer> page);
 
     boolean save(Customer customer);
 

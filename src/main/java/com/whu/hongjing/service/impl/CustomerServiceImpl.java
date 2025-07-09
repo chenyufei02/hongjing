@@ -9,7 +9,7 @@ import com.whu.hongjing.service.CustomerTagRelationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -52,9 +52,22 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         return this.list(queryWrapper); // list会返回所有匹配的记录
     }
 
+//    @Override
+//    public List<Customer> getAllCustomers() {
+//        return customerMapper.selectList(null);
+//    }
+
+
+    /**
+     * 【新增】分页查询客户列表的实现
+     * @param page 分页对象，包含了当前的页码和每页显示数量
+     * @return 包含分页信息和当前页数据的Page对象
+     */
     @Override
-    public List<Customer> getAllCustomers() {
-        return customerMapper.selectList(null);
+    public Page<Customer> getCustomerPage(Page<Customer> page) {
+        // 直接调用MyBatis-Plus提供的page方法，传入分页对象和查询条件（这里为null，即查询所有）
+        // 分页插件会自动拦截这个查询，并追加LIMIT
+        return this.page(page, null);
     }
 
     @Override

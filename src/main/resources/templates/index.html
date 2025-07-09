@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <th:block th:replace="~{layout :: common_head('工作台', ~{})}" />
+</head>
+
+<body>
+
+<div th:replace="~{layout :: navbar}"></div>
+
+<div th:replace="~{layout :: sidebar(${activeUri})}"></div>
+
+
+<div class="main-content">
+    <div class="container-fluid">
+        <div class="p-5 mb-4 bg-light rounded-3">
+            <div class="container-fluid py-5">
+                <h1 class="display-5 fw-bold">欢迎使用泓镜客户管理系统</h1>
+                <p class="col-md-8 fs-4">在这里，您可以进行客户管理、基金管理、查看客户画像等一系列操作。请从左侧的菜单开始您的工作。</p>
+                <a class="btn btn-warning btn-lg" th:href="@{/customer/list}" role="button">开始客户管理 &raquo;</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

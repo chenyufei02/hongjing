@@ -44,9 +44,9 @@ public final class TaggingConstants {
     public static final String CATEGORY_GENDER = "性别";
     public static final String CATEGORY_OCCUPATION = "职业";
     public static final String CATEGORY_AGE = "年龄分代";
-    public static final String CATEGORY_RISK_DECLARED = "申报风险等级";
+    public static final String CATEGORY_RISK_DECLARED = "申报风险";
     public static final String CATEGORY_INVESTMENT_BEHAVIOR = "投资表现";
-    public static final String CATEGORY_RISK_ACTUAL = "实盘风险等级";
+    public static final String CATEGORY_RISK_ACTUAL = "实盘风险";
     public static final String CATEGORY_RISK_DIAGNOSIS = "风险诊断结果";
 
 
@@ -91,10 +91,10 @@ public final class TaggingConstants {
     public static final String LABEL_ACTUAL_RISK_UNKNOWN = "实盘-无法评估";
 
     // 【新增】风险诊断标签
-    public static final String LABEL_DIAGNOSIS_MATCH = "风险匹配";
-    public static final String LABEL_DIAGNOSIS_OVERWEIGHT = "风险超配";
-    public static final String LABEL_DIAGNOSIS_UNDERWEIGHT = "风险偏好保守";
-    public static final String LABEL_DIAGNOSIS_UNKNOWN = "诊断-无法评估";
+    public static final String LABEL_DIAGNOSIS_MATCH = "知行合一";
+    public static final String LABEL_DIAGNOSIS_OVERWEIGHT = "行为激进";
+    public static final String LABEL_DIAGNOSIS_UNDERWEIGHT = "行为保守";
+    public static final String LABEL_DIAGNOSIS_UNKNOWN = "风险诊断未知";
 
 
 

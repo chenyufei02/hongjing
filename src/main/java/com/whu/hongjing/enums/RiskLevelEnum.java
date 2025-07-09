@@ -1,5 +1,6 @@
 package com.whu.hongjing.enums;
 
+import com.whu.hongjing.constants.TaggingConstants;
 import lombok.Getter;
 
 /**
@@ -9,11 +10,11 @@ import lombok.Getter;
 public enum RiskLevelEnum {
 
     // 定义所有的风险等级实例
-    CONSERVATIVE("保守型", 0, 20),
-    STEADY("稳健型", 21, 40),
-    BALANCED("平衡型", 41, 60), // 我们可以增加一个“平衡型”来让划分更精细
-    GROWTH("成长型", 61, 80),
-    AGGRESSIVE("激进型", 81, 100);
+    CONSERVATIVE("申报-保守型", 0, 100*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_STEADY),
+    STEADY("申报-稳健型", 100*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_STEADY, 100*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_BALANCED),
+    BALANCED("申报-平衡型", 100*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_BALANCED, 100*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_GROWTH), // 我们可以增加一个“平衡型”来让划分更精细
+    GROWTH("申报-成长型", 100*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_GROWTH, 100*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_AGGRESSIVE),
+    AGGRESSIVE("申报-激进型", 100*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_AGGRESSIVE, 100);
 
     // --- Getter 方法 ---
     // --- 枚举的属性 ---

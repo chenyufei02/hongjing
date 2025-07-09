@@ -1,7 +1,9 @@
 package com.whu.hongjing.config;
 
+import com.baomidou.mybatisplus.annotation.DbType; // 【新增】导入DbType
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.OptimisticLockerInnerInterceptor;
+import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor; // 【新增】导入分页插件
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -11,17 +13,14 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class MybatisPlusConfig {
 
-    /**
-     * 注册MyBatis-Plus的拦截器插件。
-     * 乐观锁功能必须通过注册 OptimisticLockerInnerInterceptor 插件来激活。
-     * @return 配置好的拦截器
-     */
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
-        // 1. 创建MyBatis-Plus的拦截器容器
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
 
-        // 2. 向容器中添加乐观锁插件
+        // 【新增】添加分页插件，并指定数据库类型为MySQL
+        interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
+
+        // 添加乐观锁插件
         interceptor.addInnerInterceptor(new OptimisticLockerInnerInterceptor());
 
         return interceptor;
