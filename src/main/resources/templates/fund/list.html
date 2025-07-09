@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <th:block th:replace="~{layout :: common_head('基金管理', ~{})}" />
+</head>
+
+<body>
+
+<div th:replace="~{layout :: navbar}"></div>
+<div th:replace="~{layout :: sidebar(${activeUri})}"></div>
+
+<div class="main-content">
+    <div class="container-fluid">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="h4">基金列表</h2>
+            <div>
+                <button id="import-funds-btn" class="btn btn-info me-2">一键导入所有公募基金</button>
+                <a th:href="@{/fund/add}" class="btn btn-warning">新增基金</a>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <form class="row g-3 align-items-center" th:action="@{/fund/list}" method="get">
+                    <div class="col-md-3">
+                        <label for="fundCode" class="visually-hidden">基金代码</label>
+                        <input type="text" class="form-control" id="fundCode" name="fundCode" placeholder="按基金代码模糊查询..." th:value="${fundCode}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="fundName" class="visually-hidden">基金名称</label>
+                        <input type="text" class="form-control" id="fundName" name="fundName" placeholder="按基金名称模糊查询..." th:value="${fundName}">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="fundType" class="visually-hidden">基金类型</label>
+                        <select class="form-select" id="fundType" name="fundType">
+                            <option value="">按类型查询...</option>
+                            <option th:each="type : ${fundTypes}" th:value="${type}" th:text="${type}" th:selected="${type == fundType}"></option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="riskScore" class="visually-hidden">风险分数</label>
+                        <select class="form-select" id="riskScore" name="riskScore">
+                            <option value="">按风险分查询...</option>
+                            <option th:each="score : ${#numbers.sequence(1, 5)}" th:value="${score}" th:text="${score}" th:selected="${score == riskScore}"></option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary">查询</button>
+                    </div>
+                    <div class="col-auto">
+                        <a th:href="@{/fund/list}" class="btn btn-outline-secondary">重置</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <table class="table table-hover align-middle">
+                    <thead>
+                    <tr>
+                        <th>基金代码</th>
+                        <th>基金名称</th>
+                        <th>基金类型</th>
+                        <th class="text-center">最新净值</th>
+                        <th class="text-center">风险分数</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:if="${not #lists.isEmpty(fundPage.records)}" th:each="fund : ${fundPage.records}">
+                        <td th:text="${fund.fundCode}"></td>
+                        <td th:text="${fund.fundName}"></td>
+                        <td th:text="${fund.fundType}"></td>
+                        <td class="text-center" th:text="${fund.netValue != null ? #numbers.formatDecimal(fund.netValue, 1, 4) : 'N/A'}"></td>
+                        <td class="text-center" th:text="${fund.riskScore}"></td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(fundPage.records)}">
+                        <td colspan="5" class="text-center p-4">没有找到符合条件的基金数据。</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div th:if="${fundPage.pages > 0}" class="card-footer d-flex justify-content-center align-items-center">
+                <nav aria-label="Page navigation" th:if="${fundPage.pages > 1}">
+                    <ul class="pagination mb-0">
+                        <li class="page-item" th:classappend="${fundPage.current == 1} ? 'disabled'">
+                            <a class="page-link" th:href="@{/fund/list(page=${fundPage.current - 1}, size=${fundPage.size}, fundCode=${fundCode}, fundName=${fundName}, fundType=${fundType}, riskScore=${riskScore})}">&laquo;</a>
+                        </li>
+                        <li class="page-item" th:each="pageNum : ${#numbers.sequence(startPage, endPage)}" th:classappend="${pageNum == fundPage.current} ? 'active'">
+                            <a class="page-link" th:href="@{/fund/list(page=${pageNum}, size=${fundPage.size}, fundCode=${fundCode}, fundName=${fundName}, fundType=${fundType}, riskScore=${riskScore})}" th:text="${pageNum}"></a>
+                        </li>
+                        <li class="page-item" th:classappend="${fundPage.current == fundPage.pages} ? 'disabled'">
+                             <a class="page-link" th:href="@{/fund/list(page=${fundPage.current + 1}, size=${fundPage.size}, fundCode=${fundCode}, fundName=${fundName}, fundType=${fundType}, riskScore=${riskScore})}">&raquo;</a>
+                        </li>
+                    </ul>
+                </nav>
+                <div th:if="${fundPage.pages > 1}" class="ms-3 d-flex align-items-center" style="font-size: 0.9rem;">
+                    <span>共 <span th:text="${fundPage.pages}">0</span> 页，</span>
+                    <span class="ms-2">到第</span>
+                    <label for="page-jump-input" class="visually-hidden">页码输入</label>
+                    <input type="number" class="form-control form-control-sm mx-1" style="width: 60px;" id="page-jump-input">
+                    <span>页</span>
+                    <button class="btn btn-sm btn-primary ms-1" type="button" id="page-jump-button">确定</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="loadingModal" tabindex="-1" aria-labelledby="loadingModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered border-0">
+        <div class="modal-content" style="background: transparent; border: none;">
+            <div class="modal-body text-center">
+                <div class="spinner-border text-warning" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3 text-white fs-5">正在从网络导入数万只基金数据，请耐心等待大约20-40秒...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:inline="javascript">
+/* <![CDATA[ */
+document.addEventListener('DOMContentLoaded', function() {
+    // --- “一键导入”按钮逻辑 ---
+    const importBtn = document.getElementById('import-funds-btn');
+    const loadingModalElement = document.getElementById('loadingModal');
+    const loadingModal = new bootstrap.Modal(loadingModalElement, {});
+
+    importBtn.addEventListener('click', function() {
+        if (!confirm('这将从外部数据源拉取所有公募基金数据并存入数据库，可能需要几十秒时间，确定要开始吗？')) {
+            return;
+        }
+        loadingModal.show();
+        fetch('/fund-info/import-all', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                loadingModal.hide();
+                if (data.success) {
+                    alert(data.message + '\\n页面将自动刷新。');
+                    window.location.reload();
+                } else {
+                    alert('导入失败：' + data.message);
+                }
+            })
+            .catch(error => {
+                loadingModal.hide();
+                console.error('导入基金数据时发生错误:', error);
+                alert('导入失败，发生网络或服务器错误，请查看控制台。');
+            });
+    });
+
+    // --- 【新增】页码跳转逻辑 ---
+    const jumpButton = document.getElementById('page-jump-button');
+    if (jumpButton) {
+        const totalPages = /*[[${fundPage.pages}]]*/ 0;
+        const pageSize = /*[[${fundPage.size}]]*/ 10;
+        // 获取所有查询参数
+        const fundCode = /*[[${fundCode}]]*/ null;
+        const fundName = /*[[${fundName}]]*/ null;
+        const fundType = /*[[${fundType}]]*/ null;
+        const riskScore = /*[[${riskScore}]]*/ null;
+
+        jumpButton.addEventListener('click', function() {
+            const input = document.getElementById('page-jump-input');
+            const pageNum = parseInt(input.value, 10);
+
+            if (isNaN(pageNum) || pageNum < 1 || pageNum > totalPages) {
+                alert('请输入一个有效的页码 (1 - ' + totalPages + ')');
+                return;
+            }
+
+            // 构建带所有查询参数的URL
+            let baseUrl = /*[[@{/fund/list}]]*/ '/fund/list';
+            let targetUrl = `${baseUrl}?page=${pageNum}&size=${pageSize}`;
+            if (fundCode) targetUrl += '&fundCode=' + encodeURIComponent(fundCode);
+            if (fundName) targetUrl += '&fundName=' + encodeURIComponent(fundName);
+            if (fundType) targetUrl += '&fundType=' + encodeURIComponent(fundType);
+            if (riskScore) targetUrl += '&riskScore=' + encodeURIComponent(riskScore);
+
+            window.location.href = targetUrl;
+        });
+    }
+});
+/* ]]> */
+</script>
+
+</body>
+</html>

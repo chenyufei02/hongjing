@@ -23,16 +23,20 @@
             <div class="card-body">
                 <form class="row g-3 align-items-center" th:action="@{/customer/list}" method="get">
                     <div class="col-md-2">
-                        <input type="number" class="form-control" name="id" placeholder="按客户ID精确查询..." th:value="${id}">
+                        <label for="search-id" class="visually-hidden">按客户ID精确查询</label>
+                        <input type="number" class="form-control" id="search-id" name="id" placeholder="按客户ID精确查询..." th:value="${id}">
                     </div>
                     <div class="col-md-3">
-                        <input type="text" class="form-control" name="name" placeholder="按姓名模糊查询..." th:value="${name}">
+                        <label for="search-name" class="visually-hidden">按姓名模糊查询</label>
+                        <input type="text" class="form-control" id="search-name" name="name" placeholder="按姓名模糊查询..." th:value="${name}">
                     </div>
                     <div class="col-md-3">
-                        <input type="text" class="form-control" name="idNumber" placeholder="按证件号模糊查询..." th:value="${idNumber}">
+                        <label for="search-idNumber" class="visually-hidden">按证件号模糊查询</label>
+                        <input type="text" class="form-control" id="search-idNumber" name="idNumber" placeholder="按证件号模糊查询..." th:value="${idNumber}">
                     </div>
                     <div class="col-md-2">
-                        <input type="text" class="form-control" name="tagName" placeholder="按标签查询..." th:value="${tagName}">
+                        <label for="search-tagName" class="visually-hidden">按标签查询</label>
+                        <input type="text" class="form-control" id="search-tagName" name="tagName" placeholder="按标签查询..." th:value="${tagName}">
                     </div>
                     <div class="col-auto">
                         <button type="submit" class="btn btn-primary">查询</button>
@@ -67,8 +71,8 @@
                         <td th:text="${customer.phone}"></td>
                         <td th:text="${customer.occupation}"></td>
                         <td class="text-center">
-                            <a th:href="@{/customer/detail/{id}(id=${customer.id})}" class="btn btn-sm btn-outline-primary">详情</a>
-                            <a th:href="@{/customer/edit/{id}(id=${customer.id})}" class="btn btn-sm btn-outline-warning">编辑</a>
+                            <a th:href="@{/customer/detail/{id}(id=${customer.id}, name=${name}, idNumber=${idNumber}, tagName=${tagName})}" class="btn btn-sm btn-outline-primary">详情</a>
+                            <a th:href="@{/customer/edit/{id}(id=${customer.id}, name=${name}, idNumber=${idNumber}, tagName=${tagName})}" class="btn btn-sm btn-outline-warning">编辑</a>
                             <a href="javascript:void(0);"
                                th:data-id="${customer.id}"
                                th:data-name="${customer.name}"
@@ -97,14 +101,16 @@
                         </li>
                     </ul>
                 </nav>
-                <div class="ms-3 d-flex align-items-center" style="font-size: 0.9rem;">
+                <div th:if="${customerPage.pages > 1}" class="ms-3 d-flex align-items-center" style="font-size: 0.9rem;">
                     <span>共 <span th:text="${customerPage.pages}">0</span> 页，</span>
                     <span class="ms-2">到第</span>
+                    <label for="page-jump-input" class="visually-hidden">页码输入</label>
                     <input type="number" class="form-control form-control-sm mx-1" style="width: 60px;" id="page-jump-input">
                     <span>页</span>
                     <button class="btn btn-sm btn-primary ms-1" type="button" id="page-jump-button">确定</button>
                 </div>
             </div>
+
         </div>
     </div>
 </div>
@@ -130,33 +136,26 @@
     /* <![CDATA[ */
     document.addEventListener('DOMContentLoaded', function() {
 
+        // --- 定义所有需要的查询参数变量 (客户管理专用) ---
+        const currentPage = /*[[${customerPage.current}]]*/ 1;
+        const totalPages = /*[[${customerPage.pages}]]*/ 0;
+        const pageSize = /*[[${customerPage.size}]]*/ 10;
+        const name = /*[[${name}]]*/ null;
+        const idNumber = /*[[${idNumber}]]*/ null;
+        const tagName = /*[[${tagName}]]*/ null;
+
         // --- 页码跳转逻辑 ---
         const jumpButton = document.getElementById('page-jump-button');
         if (jumpButton) {
             jumpButton.addEventListener('click', function() {
                 const input = document.getElementById('page-jump-input');
                 const pageNum = parseInt(input.value, 10);
-                const totalPages = /*[[${customerPage.pages}]]*/ 0;
-                const pageSize = /*[[${customerPage.size}]]*/ 10;
-                const customerId = /*[[${id}]]*/ null;
-                const name = /*[[${name}]]*/ null;
-                const idNumber = /*[[${idNumber}]]*/ null;
-                const tagName = /*[[${tagName}]]*/ null;
 
                 if (isNaN(pageNum) || pageNum < 1 || pageNum > totalPages) {
                     alert('请输入一个有效的页码 (1 - ' + totalPages + ')');
                     return;
                 }
-
-                let baseUrl = /*[[@{/customer/list}]]*/ '/customer/list';
-                let targetUrl = `${baseUrl}?page=${pageNum}&size=${pageSize}`;
-
-                if (customerId) targetUrl += '&id=' + customerId;
-                if (name) targetUrl += '&name=' + encodeURIComponent(name);
-                if (idNumber) targetUrl += '&idNumber=' + encodeURIComponent(idNumber);
-                if (tagName) targetUrl += '&tagName=' + encodeURIComponent(tagName);
-
-                window.location.href = targetUrl;
+                buildAndGoToUrl(pageNum);
             });
         }
 
@@ -168,16 +167,15 @@
 
         window.showDeleteModal = function(element) {
             const id = element.dataset.id;
-            const name = element.dataset.name;
+            const customerName = element.dataset.name; // 使用不同的变量名避免混淆
             customerIdToDelete = id;
             const modalBody = document.getElementById('deleteModalBody');
-            modalBody.textContent = '您确定要删除客户 “' + name + '” 吗？此操作不可撤销！';
+            modalBody.textContent = '您确定要删除客户 “' + customerName + '” 吗？此操作不可撤销！';
             deleteModal.show();
         };
 
         confirmDeleteBtn.addEventListener('click', function() {
             if (customerIdToDelete) {
-                // 使用 fetch 发送 DELETE 请求到API
                 fetch('/api/customer/delete/' + customerIdToDelete, {
                     method: 'DELETE'
                 })
@@ -185,8 +183,7 @@
                 .then(success => {
                     if (success) {
                         alert('删除成功！');
-                        // 成功后刷新当前页面，以显示最新的客户列表
-                        window.location.reload();
+                        buildAndGoToUrl(currentPage);
                     } else {
                         alert('删除失败！');
                     }
@@ -195,11 +192,22 @@
                     console.error('删除客户时发生错误:', error);
                     alert('删除失败，请查看控制台。');
                 });
-
-                // 关闭模态框
                 deleteModal.hide();
             }
         });
+
+        // --- 辅助函数，用于构建带客户查询参数的URL并跳转 ---
+        function buildAndGoToUrl(pageNum) {
+            let baseUrl = /*[[@{/customer/list}]]*/ '/customer/list';
+            let targetUrl = `${baseUrl}?page=${pageNum}&size=${pageSize}`;
+
+            // 只拼接客户管理相关的查询参数
+            if (name) targetUrl += '&name=' + encodeURIComponent(name);
+            if (idNumber) targetUrl += '&idNumber=' + encodeURIComponent(idNumber);
+            if (tagName) targetUrl += '&tagName=' + encodeURIComponent(tagName);
+
+            window.location.href = targetUrl;
+        }
     });
     /* ]]> */
 </script>

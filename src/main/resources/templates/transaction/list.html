@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <th:block th:replace="~{layout :: common_head('交易管理', ~{})}" />
+    <style>
+        .table th, .table td {
+            vertical-align: middle;
+            text-align: center;
+        }
+        .table thead th {
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+<div th:replace="~{layout :: navbar}"></div>
+<div th:replace="~{layout :: sidebar(${activeUri})}"></div>
+
+<div class="main-content">
+    <div class="container-fluid">
+        <h2 class="h4 mb-4">交易流水列表</h2>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <form class="row g-3 align-items-center" th:action="@{/transaction/list}" method="get">
+                    <div class="col-md-3">
+                        <label for="customerName" class="visually-hidden">客户姓名</label>
+                        <input type="text" class="form-control" id="customerName" name="customerName" placeholder="按客户姓名模糊查询..." th:value="${customerName}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="fundCode" class="visually-hidden">基金代码</label>
+                        <input type="text" class="form-control" id="fundCode" name="fundCode" placeholder="按基金代码模糊查询..." th:value="${fundCode}">
+                    </div>
+                    <div class="col-md-2">
+                        <label for="transactionType" class="visually-hidden">交易类型</label>
+                        <select class="form-select" id="transactionType" name="transactionType">
+                            <option value="">按交易类型查询...</option>
+                            <option value="申购" th:selected="${transactionType == '申购'}">申购</option>
+                            <option value="赎回" th:selected="${transactionType == '赎回'}">赎回</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary">查询</button>
+                    </div>
+                    <div class="col-auto">
+                        <a th:href="@{/transaction/list}" class="btn btn-outline-secondary">重置</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <table class="table table-hover">
+                    <thead>
+                    <tr>
+                        <th>
+                            <a class="table-sort-link" th:href="@{/transaction/list(page=${transactionPage.current}, size=${transactionPage.size}, customerName=${customerName}, fundCode=${fundCode}, transactionType=${transactionType}, sortField='customerId', sortOrder=${sortField == 'customerId' ? reversedSortOrder : 'asc'})}">
+                                客户姓名 (ID)
+                                <span th:if="${sortField == 'customerId'}" th:text="${sortOrder == 'asc' ? '▲' : '▼'}"></span>
+                            </a>
+                        </th>
+                        <th>基金名称 (代码)</th>
+                        <th>交易类型</th>
+                        <th>
+                            <a class="table-sort-link" th:href="@{/transaction/list(page=${transactionPage.current}, size=${transactionPage.size}, customerName=${customerName}, fundCode=${fundCode}, transactionType=${transactionType}, sortField='transactionAmount', sortOrder=${sortField == 'transactionAmount' ? reversedSortOrder : 'desc'})}">
+                                交易金额
+                                <span th:if="${sortField == 'transactionAmount'}" th:text="${sortOrder == 'asc' ? '▲' : '▼'}"></span>
+                            </a>
+                        </th>
+                        <th>交易份额</th>
+                        <th>成交净值</th>
+                        <th>交易时间</th>
+                        <th>状态</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:if="${not #lists.isEmpty(transactionPage.records)}" th:each="transaction : ${transactionPage.records}">
+                        <td>
+                            <div th:text="${transaction.customerName}"></div>
+                            <small class="text-muted" th:text="'ID: ' + ${transaction.customerId}"></small>
+                        </td>
+                        <td>
+                            <div th:text="${transaction.fundName}"></div>
+                            <small class="text-muted" th:text="'代码: ' + ${transaction.fundCode}"></small>
+                        </td>
+                        <td>
+                            <span class="badge" th:classappend="${transaction.transactionType == '申购' ? 'bg-danger' : 'bg-success'}" th:text="${transaction.transactionType}"></span>
+                        </td>
+                        <td th:text="${#numbers.formatDecimal(transaction.transactionAmount, 1, 2)}"></td>
+                        <td th:text="${#numbers.formatDecimal(transaction.transactionShares, 1, 2)}"></td>
+                        <td th:text="${#numbers.formatDecimal(transaction.sharePrice, 1, 4)}"></td>
+                        <td th:text="${#temporals.format(transaction.transactionTime, 'yyyy-MM-dd HH:mm')}"></td>
+                        <td th:text="${transaction.status}"></td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(transactionPage.records)}">
+                        <td colspan="8" class="text-center p-4">没有找到符合条件的交易数据。</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div th:if="${transactionPage.pages > 0}" class="card-footer d-flex justify-content-center align-items-center">
+                <nav aria-label="Page navigation" th:if="${transactionPage.pages > 1}">
+                    <ul class="pagination mb-0">
+                        <li class="page-item" th:classappend="${transactionPage.current == 1} ? 'disabled'">
+                            <a class="page-link" th:href="@{/transaction/list(page=${transactionPage.current - 1}, size=${transactionPage.size}, customerName=${customerName}, fundCode=${fundCode}, transactionType=${transactionType}, sortField=${sortField}, sortOrder=${sortOrder})}">&laquo;</a>
+                        </li>
+                        <li class="page-item" th:each="pageNum : ${#numbers.sequence(startPage, endPage)}" th:classappend="${pageNum == transactionPage.current} ? 'active'">
+                            <a class="page-link" th:href="@{/transaction/list(page=${pageNum}, size=${transactionPage.size}, customerName=${customerName}, fundCode=${fundCode}, transactionType=${transactionType}, sortField=${sortField}, sortOrder=${sortOrder})}" th:text="${pageNum}"></a>
+                        </li>
+                        <li class="page-item" th:classappend="${transactionPage.current == transactionPage.pages} ? 'disabled'">
+                             <a class="page-link" th:href="@{/transaction/list(page=${transactionPage.current + 1}, size=${transactionPage.size}, customerName=${customerName}, fundCode=${fundCode}, transactionType=${transactionType}, sortField=${sortField}, sortOrder=${sortOrder})}">&raquo;</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>

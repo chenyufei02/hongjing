@@ -1,18 +1,24 @@
 package com.whu.hongjing.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.whu.hongjing.mapper.CustomerHoldingMapper;
+import com.whu.hongjing.pojo.entity.Customer;
 import com.whu.hongjing.pojo.entity.CustomerHolding;
 import com.whu.hongjing.pojo.entity.FundInfo;
 import com.whu.hongjing.pojo.entity.FundTransaction;
+import com.whu.hongjing.pojo.vo.CustomerHoldingVO;
 import com.whu.hongjing.service.CustomerHoldingService;
+import com.whu.hongjing.service.CustomerService;
 import com.whu.hongjing.service.FundTransactionService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.whu.hongjing.service.FundInfoService;
+import org.springframework.util.StringUtils;
+
+import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.math.BigDecimal;
@@ -26,8 +32,7 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
     @Autowired
     private FundTransactionService fundTransactionService;
     @Autowired
-    @Lazy
-    private CustomerHoldingService self;
+    private CustomerService customerService;
     @Autowired
     private FundInfoService fundInfoService;
 
@@ -176,32 +181,103 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
         this.saveOrUpdate(holding);
     }
 
-
     @Override
-    public void recalculateAllMarketValues() {
-        // 1. 一次性获取所有基金的净值
-        Map<String, BigDecimal> fundPriceMap = fundInfoService.list().stream()
-                .filter(fund -> fund.getNetValue() != null)
-                .collect(Collectors.toMap(FundInfo::getFundCode, FundInfo::getNetValue));
-
-        // 2. 一次性获取所有持仓记录
-        List<CustomerHolding> allHoldings = this.list();
-        if (allHoldings.isEmpty()) {
-            return;
-        }
-
-        // 3. 遍历并更新市值
-        for (CustomerHolding holding : allHoldings) {
-            BigDecimal latestNetValue = fundPriceMap.get(holding.getFundCode());
-            if (latestNetValue != null && holding.getTotalShares() != null) {
-                BigDecimal newMarketValue = holding.getTotalShares().multiply(latestNetValue)
-                                                    .setScale(2, RoundingMode.HALF_UP);
-                holding.setMarketValue(newMarketValue);
+    @Transactional(readOnly = true) // 使用只读事务，提高查询性能
+    public Page<CustomerHoldingVO> getHoldingPage(
+            Page<CustomerHoldingVO> page, String customerName,
+            String fundCode, String sortField, String sortOrder)
+    {
+        // --- 步骤 1: 根据查询条件，筛选出符合条件的客户ID和基金代码 ---
+        List<Long> customerIds = null;
+        if (StringUtils.hasText(customerName)) {
+            // 根据客户姓名模糊查询，获取所有匹配的客户ID
+            customerIds = customerService.lambdaQuery()
+                    .like(Customer::getName, customerName)
+                    .list()
+                    .stream()
+                    .map(Customer::getId)
+                    .collect(Collectors.toList());
+            // 如果根据姓名没有找到任何客户，直接返回空的分页结果
+            if (customerIds.isEmpty()) {
+                return page.setRecords(Collections.emptyList());
             }
         }
 
-        // 4. 将更新后的所有持仓数据，批量写回数据库
-         self.updateBatchById(allHoldings);
-        System.out.println("【批量任务】(全量版) 成功更新了 " + allHoldings.size() + " 条持仓记录的最新市值。");
+        // --- 步骤 2: 构建对持仓表 (customer_holding) 的分页查询 ---
+        QueryWrapper<CustomerHolding> holdingQueryWrapper = new QueryWrapper<>();
+        if (customerIds != null) {
+            holdingQueryWrapper.in("customer_id", customerIds);
+        }
+        if (StringUtils.hasText(fundCode)) {
+            holdingQueryWrapper.like("fund_code", fundCode);
+        }
+
+        // 【【【 新增的排序逻辑 】】】
+        if (StringUtils.hasText(sortField) && StringUtils.hasText(sortOrder)) {
+            String dbColumn;
+            // 手动将前端传来的驼峰字段名，转换为数据库的下划线列名
+            switch (sortField) {
+                case "customerId":
+                    dbColumn = "customer_id";
+                    break;
+                case "marketValue":
+                    dbColumn = "market_value";
+                    break;
+                default:
+                    dbColumn = "last_update_date";
+                    sortOrder = "desc";
+            }
+
+            if ("asc".equalsIgnoreCase(sortOrder)) {
+                holdingQueryWrapper.orderByAsc(dbColumn);
+            } else {
+                holdingQueryWrapper.orderByDesc(dbColumn);
+            }
+        } else {
+            // 默认排序
+            holdingQueryWrapper.orderByDesc("last_update_date");
+        }
+
+
+        // 执行分页查询，注意这里查的是 CustomerHolding 实体
+        Page<CustomerHolding> holdingPage = new Page<>(page.getCurrent(), page.getSize());
+        this.page(holdingPage, holdingQueryWrapper);
+
+        List<CustomerHolding> holdingRecords = holdingPage.getRecords();
+        if (holdingRecords.isEmpty()) {
+            return page.setRecords(Collections.emptyList());
+        }
+
+        // --- 步骤 3: 批量获取关联的客户和基金信息，以提高性能 ---
+        // 提取所有需要的 customerId 和 fundCode
+        List<Long> resultCustomerIds = holdingRecords.stream().map(CustomerHolding::getCustomerId).distinct().collect(Collectors.toList());
+        List<String> resultFundCodes = holdingRecords.stream().map(CustomerHolding::getFundCode).distinct().collect(Collectors.toList());
+
+        // 一次性查询出所有相关的客户和基金信息
+        Map<Long, String> customerIdToNameMap = customerService.listByIds(resultCustomerIds).stream()
+                .collect(Collectors.toMap(Customer::getId, Customer::getName));
+        Map<String, String> fundCodeToNameMap = fundInfoService.listByIds(resultFundCodes).stream()
+                .collect(Collectors.toMap(FundInfo::getFundCode, FundInfo::getFundName));
+
+        // --- 步骤 4: 组装最终的 CustomerHoldingVO 列表 ---
+        List<CustomerHoldingVO> voRecords = holdingRecords.stream().map(holding -> {
+            CustomerHoldingVO vo = new CustomerHoldingVO();
+            vo.setId(holding.getId());
+            vo.setTotalShares(holding.getTotalShares());
+            vo.setAverageCost(holding.getAverageCost());
+            vo.setMarketValue(holding.getMarketValue());
+            vo.setLastUpdateDate(holding.getLastUpdateDate());
+            vo.setCustomerId(holding.getCustomerId());
+            vo.setFundCode(holding.getFundCode());
+            // 从Map中获取关联的名称
+            vo.setCustomerName(customerIdToNameMap.get(holding.getCustomerId()));
+            vo.setFundName(fundCodeToNameMap.get(holding.getFundCode()));
+            return vo;
+        }).collect(Collectors.toList());
+
+        // --- 步骤 5: 设置分页结果并返回 ---
+        page.setRecords(voRecords);
+        page.setTotal(holdingPage.getTotal());
+        return page;
     }
 }

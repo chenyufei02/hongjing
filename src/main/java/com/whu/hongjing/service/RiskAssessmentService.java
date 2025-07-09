@@ -3,6 +3,8 @@ package com.whu.hongjing.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.whu.hongjing.pojo.dto.RiskAssessmentSubmitDTO;
 import com.whu.hongjing.pojo.entity.RiskAssessment;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.whu.hongjing.pojo.vo.RiskAssessmentVO;
 
 public interface RiskAssessmentService extends IService<RiskAssessment> {
 
@@ -14,4 +16,16 @@ public interface RiskAssessmentService extends IService<RiskAssessment> {
      */
     RiskAssessment createAssessment(RiskAssessmentSubmitDTO dto);
 
+   /**
+     * 【修改】根据条件分页查询风险评估记录, 增加排序功能
+     * @param page 分页对象
+     * @param customerName 客户姓名 (模糊查询)
+     * @param riskLevel 风险等级 (精确查询)
+     * @param sortField 排序字段 (customerId, riskScore, assessmentDate)
+     * @param sortOrder 排序顺序 (asc, desc)
+     * @return 包含风险评估视图对象(VO)的分页结果
+     */
+   Page<RiskAssessmentVO> getAssessmentPage(
+           Page<RiskAssessmentVO> page, String customerName,
+           String riskLevel, String sortField, String sortOrder);
 }

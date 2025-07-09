@@ -1,26 +1,32 @@
 package com.whu.hongjing.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.whu.hongjing.exception.InsufficientFundsException;
 import com.whu.hongjing.mapper.FundTransactionMapper;
 import com.whu.hongjing.pojo.dto.FundPurchaseDTO;
 import com.whu.hongjing.pojo.dto.FundRedeemDTO;
+import com.whu.hongjing.pojo.entity.Customer;
 import com.whu.hongjing.pojo.entity.CustomerHolding;
 import com.whu.hongjing.pojo.entity.FundTransaction;
-import com.whu.hongjing.service.CustomerHoldingService;
+import com.whu.hongjing.pojo.vo.FundTransactionVO;
+import com.whu.hongjing.service.*;
 import com.whu.hongjing.pojo.entity.FundInfo;
-import com.whu.hongjing.service.FundInfoService;
-import com.whu.hongjing.service.FundTransactionService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
-import com.whu.hongjing.service.TagRefreshService;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import org.springframework.util.StringUtils;
 
 /**
  * 基金交易服务实现类
@@ -32,6 +38,9 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
     @Autowired
     @Lazy
     private TagRefreshService tagRefreshService;
+
+    @Autowired
+    private CustomerService customerService;
 
     @Autowired
     private FundInfoService fundInfoService;
@@ -143,4 +152,109 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
         // 步骤3：返回包含ID的完整交易实体
         return transaction;
     }
+
+
+    /**
+     * 分页查询
+     * @param page customerName, fundCode, transactionType]
+     * @return com.baomidou.mybatisplus.extension.plugins.pagination.Page<com.whu.hongjing.pojo.vo.FundTransactionVO>
+     * @author yufei
+     * @since 2025/7/9
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Page<FundTransactionVO> getTransactionPage(
+            Page<FundTransactionVO> page, String customerName,
+            String fundCode, String transactionType, String sortField,
+            String sortOrder)
+    {
+        // 步骤 1: 根据客户姓名查询匹配的客户ID
+        List<Long> customerIds = null;
+        if (StringUtils.hasText(customerName)) {
+            customerIds = customerService.lambdaQuery()
+                    .like(Customer::getName, customerName)
+                    .list().stream()
+                    .map(Customer::getId)
+                    .collect(Collectors.toList());
+            if (customerIds.isEmpty()) {
+                return page.setRecords(Collections.emptyList());
+            }
+        }
+
+        // 步骤 2: 构建对交易表的分页查询
+        QueryWrapper<FundTransaction> transactionQueryWrapper = new QueryWrapper<>();
+        if (customerIds != null) {
+            transactionQueryWrapper.in("customer_id", customerIds);
+        }
+        if (StringUtils.hasText(fundCode)) {
+            transactionQueryWrapper.like("fund_code", fundCode);
+        }
+        if (StringUtils.hasText(transactionType)) {
+            transactionQueryWrapper.eq("transaction_type", transactionType);
+        }
+
+        // 【【【 新增的排序逻辑 】】】
+        if (StringUtils.hasText(sortField) && StringUtils.hasText(sortOrder)) {
+            String dbColumn;
+            // 手动将前端传来的驼峰字段名，转换为数据库的下划线列名
+            switch (sortField) {
+                case "customerId":
+                    dbColumn = "customer_id";
+                    break;
+                case "transactionAmount":
+                    dbColumn = "transaction_amount";
+                    break;
+                default:
+                    dbColumn = "transaction_time";
+                    sortOrder = "desc";
+            }
+
+            if ("asc".equalsIgnoreCase(sortOrder)) {
+                transactionQueryWrapper.orderByAsc(dbColumn);
+            } else {
+                transactionQueryWrapper.orderByDesc(dbColumn);
+            }
+        } else {
+            // 默认排序
+            transactionQueryWrapper.orderByDesc("transaction_time");
+        }
+
+        Page<FundTransaction> transactionPage = new Page<>(page.getCurrent(), page.getSize());
+        this.page(transactionPage, transactionQueryWrapper);
+
+        List<FundTransaction> transactionRecords = transactionPage.getRecords();
+        if (transactionRecords.isEmpty()) {
+            return page.setRecords(Collections.emptyList());
+        }
+
+        // 步骤 3: 批量获取关联的客户和基金信息
+        List<Long> resultCustomerIds = transactionRecords.stream().map(FundTransaction::getCustomerId).distinct().collect(Collectors.toList());
+        List<String> resultFundCodes = transactionRecords.stream().map(FundTransaction::getFundCode).distinct().collect(Collectors.toList());
+
+        Map<Long, String> customerIdToNameMap = customerService.listByIds(resultCustomerIds).stream()
+                .collect(Collectors.toMap(Customer::getId, Customer::getName));
+        Map<String, String> fundCodeToNameMap = fundInfoService.listByIds(resultFundCodes).stream()
+                .collect(Collectors.toMap(FundInfo::getFundCode, FundInfo::getFundName));
+
+        // 步骤 4: 组装最终的 FundTransactionVO 列表
+        List<FundTransactionVO> voRecords = transactionRecords.stream().map(transaction -> {
+            FundTransactionVO vo = new FundTransactionVO();
+            // 复制所有交易信息
+            BeanUtils.copyProperties(transaction, vo);
+            // 填充关联的名称信息
+            vo.setCustomerName(customerIdToNameMap.get(transaction.getCustomerId()));
+            vo.setFundName(fundCodeToNameMap.get(transaction.getFundCode()));
+            return vo;
+        }).collect(Collectors.toList());
+
+        // 步骤 5: 设置分页结果并返回
+        page.setRecords(voRecords);
+        page.setTotal(transactionPage.getTotal());
+        return page;
+    }
+
+
+
+
+
 }

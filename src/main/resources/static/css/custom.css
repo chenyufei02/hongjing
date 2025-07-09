@@ -52,3 +52,24 @@ body {
     border-radius: 4px; /* 轻微的圆角 */
     box-shadow: 0 2px 4px rgba(0,0,0,0.05); /* 添加一点阴影，更有质感 */
 }
+
+
+
+/* 风险等级标签的最终版颜色方案 */
+/* 风险等级-成长型（橙色）的专属样式 */
+.badge-growth-orange {
+    color: #fff;
+    background-color: #fd7e14; /* Bootstrap 5 标准橙色 */
+}
+
+
+/* 移除表格排序链接的默认样式 */
+.table-sort-link {
+    color: inherit; /* 继承父元素(th)的文字颜色，通常是黑色或深灰色 */
+    text-decoration: none; /* 移除下划线 */
+}
+
+.table-sort-link:hover {
+    color: inherit; /* 鼠标悬浮时也保持原色 */
+    text-decoration: none;
+}

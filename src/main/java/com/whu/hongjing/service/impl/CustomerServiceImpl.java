@@ -54,24 +54,15 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         return this.list(queryWrapper); // list会返回所有匹配的记录
     }
 
-//    @Override
-//    public List<Customer> getAllCustomers() {
-//        return customerMapper.selectList(null);
-//    }
-
 
     /**
-     * 【修改】分页查询客户列表的实现，增加了动态条件查询
-     * @param page 分页对象
-     * @param name 客户姓名 (可选，用于模糊查询)
-     * @param idNumber 证件号码 (可选，用于模糊查询)
-     * @return 包含分页和查询结果的Page对象
+     * 分页查询客户列表的实现，增加了动态条件查询和稳定的排序
      */
-    /**
-     * 【修改】分页查询客户列表的实现，增加了动态条件查询和稳定的排序
-     */
-@Override
-    public Page<Customer> getCustomerPage(Page<Customer> page, Long customerId, String name, String idNumber, String tagName) {
+    @Override
+    public Page<Customer> getCustomerPage(
+            Page<Customer> page, Long customerId,
+            String name, String idNumber, String tagName)
+    {
         QueryWrapper<Customer> queryWrapper = new QueryWrapper<>();
 
         // 处理按客户ID的精确查询

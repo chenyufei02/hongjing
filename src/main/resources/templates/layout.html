@@ -27,11 +27,21 @@
         <li class="nav-item">
             <a class="nav-link" th:classappend="${activeUri == '/customer/list' ? 'active' : ''}" th:href="@{/customer/list}">客户管理</a>
         </li>
-        <li class="nav-item"><a class="nav-link" href="#">基金管理</a></li>
-        <li class="nav-item"><a class="nav-link" href="#">持仓管理</a></li>
-        <li class="nav-item"><a class="nav-link" href="#">交易管理</a></li>
-        <li class="nav-item"><a class="nav-link" href="#">风险管理</a></li>
-        <li class="nav-item"><a class="nav-link" href="#">标签管理</a></li>
+         <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeUri == '/fund/list' ? 'active' : ''}" th:href="@{/fund/list}">基金管理</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeUri == '/holding/list' ? 'active' : ''}" th:href="@{/holding/list}">持仓管理</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeUri == '/transaction/list' ? 'active' : ''}" th:href="@{/transaction/list}">交易管理</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeUri == '/risk/list' ? 'active' : ''}" th:href="@{/risk/list}">风险管理</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeUri == '/tag/list' ? 'active' : ''}" th:href="@{/tag/list}">标签管理</a>
+        </li>
         <li class="nav-item"><a class="nav-link" href="#">盈亏管理</a></li>
         <li class="nav-item"><a class="nav-link" href="#">可视化画像</a></li>
     </ul>
