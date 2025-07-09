@@ -37,10 +37,10 @@ public final class TaggingConstants {
     public static final double ACTUAL_RISK_THRESHOLD_STEADY = 1.5;     // 稳健型
 
     // --- 2. 标签分类 (Categories) ---
-    public static final String CATEGORY_ASSET = "资产规模M";
+    public static final String CATEGORY_ASSET = "资产规模";
     public static final String CATEGORY_STYLE = "持仓风格";
-    public static final String CATEGORY_RECENCY = "近期活跃度R";
-    public static final String CATEGORY_FREQUENCY = "交易频率F";
+    public static final String CATEGORY_RECENCY = "近期";
+    public static final String CATEGORY_FREQUENCY = "历史";
     public static final String CATEGORY_GENDER = "性别";
     public static final String CATEGORY_OCCUPATION = "职业";
     public static final String CATEGORY_AGE = "年龄分代";
@@ -60,27 +60,27 @@ public final class TaggingConstants {
     public static final String LABEL_ASSET_LOW = "资产: <10万";
 
     // 持仓风格标签
-    public static final String LABEL_STYLE_LONG_TERM = "风格: 长期持有型";
-    public static final String LABEL_STYLE_SHORT_TERM = "风格: 短期交易型";
+    public static final String LABEL_STYLE_LONG_TERM = "风格: 长持型";
+    public static final String LABEL_STYLE_SHORT_TERM = "风格: 交易型";
 
     // 短期交易型 - 近期活跃度(R)标签
-    public static final String LABEL_RECENCY_SHORT_ACTIVE = "行为: 近期活跃";
-    public static final String LABEL_RECENCY_SHORT_SLEEP = "行为: 近期沉睡";
-    public static final String LABEL_RECENCY_SHORT_LOST = "行为: 近期流失";
+    public static final String LABEL_RECENCY_SHORT_ACTIVE = "近期: 近期活跃";
+    public static final String LABEL_RECENCY_SHORT_SLEEP = "近期: 近期沉睡";
+    public static final String LABEL_RECENCY_SHORT_LOST = "近期: 近期流失";
 
     // 短期交易型 - 历史习惯(F)标签
-    public static final String LABEL_FREQUENCY_SHORT_HIGH = "习惯: 高频交易";
-    public static final String LABEL_FREQUENCY_SHORT_MEDIUM = "习惯: 中频交易";
-    public static final String LABEL_FREQUENCY_SHORT_LOW = "习惯: 低频交易";
+    public static final String LABEL_FREQUENCY_SHORT_HIGH = "历史: 高频交易";
+    public static final String LABEL_FREQUENCY_SHORT_MEDIUM = "历史: 中频交易";
+    public static final String LABEL_FREQUENCY_SHORT_LOW = "历史: 低频交易";
 
     // 长期持有型 - 近期活跃度(R)标签
-    public static final String LABEL_RECENCY_LONG_INVEST = "行为: 持续投入";
-    public static final String LABEL_RECENCY_LONG_STAGNANT = "行为: 投入停滞";
-    public static final String LABEL_RECENCY_LONG_OUTFLOW = "行为: 资产流出";
+    public static final String LABEL_RECENCY_LONG_INVEST = "近期: 持续投入";
+    public static final String LABEL_RECENCY_LONG_STAGNANT = "近期: 投入停滞";
+    public static final String LABEL_RECENCY_LONG_OUTFLOW = "近期: 资产流出";
 
     // 长期持有型 - 历史习惯(F)标签
-    public static final String LABEL_FREQUENCY_LONG_REGULAR = "习惯: 有定投行为";
-    public static final String LABEL_FREQUENCY_LONG_IRREGULAR = "习惯: 无定投行为";
+    public static final String LABEL_FREQUENCY_LONG_REGULAR = "历史: 有定投行为";
+    public static final String LABEL_FREQUENCY_LONG_IRREGULAR = "历史: 无定投行为";
 
     // 实盘风险等级标签
     public static final String LABEL_ACTUAL_RISK_AGGRESSIVE = "实盘-激进型";

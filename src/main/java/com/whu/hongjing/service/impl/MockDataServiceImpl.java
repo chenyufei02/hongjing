@@ -98,7 +98,7 @@ public class MockDataServiceImpl implements MockDataService {
 
         List<Future<Void>> writerFutures = new ArrayList<>();
 
-                try {
+        try {
             System.out.println("【创世】等待计算任务完成，并向写入线程池提交独立的并发写入任务...");
             for (Future<Customer> future : calcFutures) {
                 // a. 获取一个在内存中预先计算好的Customer对象
@@ -366,7 +366,7 @@ public class MockDataServiceImpl implements MockDataService {
              if (!writerExecutor.isTerminated()) writerExecutor.shutdownNow();
         }
 
-        return "【演绎】任务完成！成功模拟并保存了交易数据。请更新市值并刷新客户标签。";
+        return "【演绎】任务完成！成功模拟并保存了交易数据。请更新市值与持仓后再刷新客户标签！";
     }
 
     // createTransaction 辅助方法保持不变

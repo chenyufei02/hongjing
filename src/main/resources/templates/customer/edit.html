@@ -18,65 +18,77 @@
 
         <div class="card">
             <div class="card-body">
-                <form th:action="@{/customer/update}" th:object="${customerUpdateDTO}" method="post">
-                    <input type="hidden" th:field="*{id}" />
+                <form id="edit-customer-form" th:object="${customerUpdateDTO}">
+                    <input type="hidden" name="id" th:value="*{id}" />
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="name" class="form-label">姓名 <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="name" th:field="*{name}" required>
+                            <input type="text" class="form-control" id="name" name="name" th:value="*{name}" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="gender" class="form-label">性别 <span class="text-danger">*</span></label>
-                            <select class="form-select" id="gender" th:field="*{gender}" required>
+                            <select class="form-select" id="gender" name="gender" th:field="*{gender}" required>
                                 <option value="男">男</option>
                                 <option value="女">女</option>
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="idType" class="form-label">证件类型 <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="idType" th:field="*{idType}" required>
+                            <input type="text" class="form-control" id="idType" name="idType" th:value="*{idType}" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="idNumber" class="form-label">证件号码 <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="idNumber" th:field="*{idNumber}"
-                                   th:classappend="${#fields.hasErrors('idNumber')} ? 'is-invalid' : ''" required>
-                            <div th:if="${#fields.hasErrors('idNumber')}" class="invalid-feedback" th:errors="*{idNumber}"></div>
+                            <input type="text" class="form-control" id="idNumber" name="idNumber" th:value="*{idNumber}" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="birthDate" class="form-label">出生日期 <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control" id="birthDate" th:field="*{birthDate}" required>
+                            <input type="date" class="form-control" id="birthDate" name="birthDate" th:value="*{birthDate}" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="nationality" class="form-label">国籍 <span class="text-danger">*</span></label>
-                            <select class="form-select" id="nationality" th:field="*{nationality}" required>
+                            <select class="form-select" id="nationality" name="nationality" th:field="*{nationality}" required>
                                 <option value="中国">中国</option>
                                 <option value="中国香港">中国香港</option>
                                 <option value="中国澳门">中国澳门</option>
                                 <option value="中国台湾">中国台湾</option>
                                 <option value="美国">美国</option>
-                                <option value="新加坡">新加坡</option>
                                 <option value="日本">日本</option>
-                                <option value="韩国">韩国</option>
                                 <option value="英国">英国</option>
                                 <option value="法国">法国</option>
                                 <option value="德国">德国</option>
+                                <option value="韩国">韩国</option>
+                                <option value="意大利">意大利</option>
+                                <option value="西班牙">西班牙</option>
+                                <option value="瑞士">瑞士</option>
+                                <option value="丹麦">丹麦</option>
+                                <option value="葡萄牙">葡萄牙</option>
+                                <option value="泰国">泰国</option>
+                                <option value="加拿大">加拿大</option>
+                                <option value="墨西哥">墨西哥</option>
+                                <option value="阿根廷">阿根廷</option>
+                                <option value="巴西">巴西</option>
+                                <option value="新加坡">新加坡</option>
+                                <option value="越南">越南</option>
+                                <option value="老挝">老挝</option>
+                                <option value="柬埔寨">柬埔寨</option>
+                                <option value="印度">印度</option>
+                                <option value="俄罗斯">俄罗斯</option>
+                                <option value="土耳其">土耳其</option>
                                 <option value="其他">其他</option>
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="occupation" class="form-label">职业 <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="occupation" th:field="*{occupation}" required>
+                            <input type="text" class="form-control" id="occupation" name="occupation" th:value="*{occupation}" required>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="phone" class="form-label">手机号 <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="phone" th:field="*{phone}"
-                                   th:classappend="${#fields.hasErrors('phone')} ? 'is-invalid' : ''" required>
-                            <div th:if="${#fields.hasErrors('phone')}" class="invalid-feedback" th:errors="*{phone}"></div>
+                            <input type="text" class="form-control" id="phone" name="phone" th:value="*{phone}" required>
                         </div>
                         <div class="col-12 mb-3">
                             <label for="address" class="form-label">联系地址 <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="address" th:field="*{address}" required>
+                            <input type="text" class="form-control" id="address" name="address" th:value="*{address}" required>
                         </div>
                     </div>
 
@@ -89,6 +101,48 @@
         </div>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('edit-customer-form');
+
+    form.addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        const formData = new FormData(form);
+        const customerData = {};
+        formData.forEach((value, key) => {
+            customerData[key] = value;
+        });
+
+        fetch('/api/customer/update', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(customerData)
+        })
+        .then(response => {
+            if (!response.ok) {
+                // 如果后端返回4xx或5xx错误，我们可以在这里处理
+                alert('修改失败，请检查输入或联系管理员！');
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(success => {
+            if (success) {
+                alert('修改客户成功！');
+                window.location.href = '/customer/list';
+            } else {
+                alert('修改失败！');
+            }
+        })
+        .catch(error => {
+            console.error('修改客户时发生错误:', error);
+        });
+    });
+});
+</script>
 
 </body>
 </html>

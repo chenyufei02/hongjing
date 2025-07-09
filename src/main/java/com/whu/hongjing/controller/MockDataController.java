@@ -49,12 +49,12 @@ public class MockDataController {
      * 手动触发一次每日的基金净值更新，以及所有客户持仓市值的重新计算。调用的是定时任务的服务而非测试数据的服务。
      */
     @PostMapping("/trigger-daily-update")
-    @Operation(summary = "【工具III：刷新净值】手动触发一次每日净值和市值的更新任务")
+    @Operation(summary = "【工具III：刷新净值】手动触发一次每日净值和市值的更新任务，并接着更新客户持仓数据。")
     public ApiResponseVO triggerDailyUpdate() {
         try {
             // 直接调用定时任务的核心方法
             scheduledTasksService.updateNetValueAndMarketValueDaily();
-            return new ApiResponseVO(true, "每日净值和市值更新任务已手动触发并成功执行！");
+            return new ApiResponseVO(true, "每日净值和市值更新任务已手动触发并成功执行！同时更新了客户持仓数据！");
         } catch (Exception e) {
             e.printStackTrace();
             return new ApiResponseVO(false, "手动触发每日任务失败: " + e.getMessage());

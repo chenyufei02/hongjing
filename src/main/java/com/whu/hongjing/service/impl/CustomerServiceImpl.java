@@ -13,6 +13,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.util.StringUtils;
+
 
 @Service
 public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> implements CustomerService {
@@ -59,16 +61,53 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
 
     /**
-     * 【新增】分页查询客户列表的实现
-     * @param page 分页对象，包含了当前的页码和每页显示数量
-     * @return 包含分页信息和当前页数据的Page对象
+     * 【修改】分页查询客户列表的实现，增加了动态条件查询
+     * @param page 分页对象
+     * @param name 客户姓名 (可选，用于模糊查询)
+     * @param idNumber 证件号码 (可选，用于模糊查询)
+     * @return 包含分页和查询结果的Page对象
      */
-    @Override
-    public Page<Customer> getCustomerPage(Page<Customer> page) {
-        // 直接调用MyBatis-Plus提供的page方法，传入分页对象和查询条件（这里为null，即查询所有）
-        // 分页插件会自动拦截这个查询，并追加LIMIT
-        return this.page(page, null);
+    /**
+     * 【修改】分页查询客户列表的实现，增加了动态条件查询和稳定的排序
+     */
+@Override
+    public Page<Customer> getCustomerPage(Page<Customer> page, Long customerId, String name, String idNumber, String tagName) {
+        QueryWrapper<Customer> queryWrapper = new QueryWrapper<>();
+
+        // 处理按客户ID的精确查询
+        // 如果传入了 customerId，则其他所有条件都忽略，只按ID查询
+        if (customerId != null) {
+            queryWrapper.eq("id", customerId);
+            return this.page(page, queryWrapper);
+        }
+
+        // --- 如果没有传入ID，则处理其他模糊查询和标签查询 ---
+
+        if (StringUtils.hasText(tagName)) {
+            QueryWrapper<CustomerTagRelation> tagQuery = new QueryWrapper<>();
+            tagQuery.eq("tag_name", tagName).select("customer_id");
+            List<Long> customerIds = customerTagRelationService.list(tagQuery)
+                    .stream()
+                    .map(CustomerTagRelation::getCustomerId)
+                    .collect(Collectors.toList());
+            if (customerIds.isEmpty()) {
+                return new Page<>(page.getCurrent(), page.getSize(), 0);
+            }
+            queryWrapper.in("id", customerIds);
+        }
+
+        if (StringUtils.hasText(name)) {
+            queryWrapper.like("name", name);
+        }
+        if (StringUtils.hasText(idNumber)) {
+            queryWrapper.like("id_number", idNumber);
+        }
+
+        queryWrapper.orderByAsc("id");
+
+        return this.page(page, queryWrapper);
     }
+
 
     @Override
     public boolean save(Customer entity) {

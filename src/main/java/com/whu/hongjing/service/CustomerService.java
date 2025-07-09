@@ -13,7 +13,7 @@ public interface CustomerService extends IService<Customer>{
     Customer getCustomerById(Long id);
 
     // 分页显示和查询客户的方法
-    Page<Customer> getCustomerPage(Page<Customer> page);
+    Page<Customer> getCustomerPage(Page<Customer> page, Long customerId, String name, String idNumber, String tagName);
 
     boolean save(Customer customer);
 

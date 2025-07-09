@@ -19,6 +19,31 @@
             </div>
         </div>
 
+        <div class="card mb-4">
+            <div class="card-body">
+                <form class="row g-3 align-items-center" th:action="@{/customer/list}" method="get">
+                    <div class="col-md-2">
+                        <input type="number" class="form-control" name="id" placeholder="按客户ID精确查询..." th:value="${id}">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" class="form-control" name="name" placeholder="按姓名模糊查询..." th:value="${name}">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" class="form-control" name="idNumber" placeholder="按证件号模糊查询..." th:value="${idNumber}">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="text" class="form-control" name="tagName" placeholder="按标签查询..." th:value="${tagName}">
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary">查询</button>
+                    </div>
+                    <div class="col-auto">
+                        <a th:href="@{/customer/list}" class="btn btn-outline-secondary">重置</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-body">
                 <table class="table table-hover align-middle">
@@ -35,12 +60,12 @@
                     </thead>
                     <tbody>
                     <tr th:if="${not #lists.isEmpty(customerPage.records)}" th:each="customer : ${customerPage.records}">
-                        <td th:text="${customer.id}">99</td>
-                        <td th:text="${customer.name}">张三</td>
-                        <td th:text="${customer.gender}">男</td>
-                        <td th:text="${customer.idNumber}">4201...</td>
-                        <td th:text="${customer.phone}">138****0000</td>
-                        <td th:text="${customer.occupation}">软件工程师</td>
+                        <td th:text="${customer.id}"></td>
+                        <td th:text="${customer.name}"></td>
+                        <td th:text="${customer.gender}"></td>
+                        <td th:text="${customer.idNumber}"></td>
+                        <td th:text="${customer.phone}"></td>
+                        <td th:text="${customer.occupation}"></td>
                         <td class="text-center">
                             <a th:href="@{/customer/detail/{id}(id=${customer.id})}" class="btn btn-sm btn-outline-primary">详情</a>
                             <a th:href="@{/customer/edit/{id}(id=${customer.id})}" class="btn btn-sm btn-outline-warning">编辑</a>
@@ -52,7 +77,7 @@
                         </td>
                     </tr>
                     <tr th:if="${#lists.isEmpty(customerPage.records)}">
-                        <td colspan="7" class="text-center p-4">暂无客户数据</td>
+                        <td colspan="7" class="text-center p-4">没有找到符合条件的客户数据</td>
                     </tr>
                     </tbody>
                 </table>
@@ -62,13 +87,13 @@
                 <nav aria-label="Page navigation" th:if="${customerPage.pages > 1}">
                     <ul class="pagination mb-0">
                         <li class="page-item" th:classappend="${customerPage.current == 1} ? 'disabled'">
-                            <a class="page-link" th:href="@{/customer/list(page=${customerPage.current - 1}, size=${customerPage.size})}">&laquo;</a>
+                            <a class="page-link" th:href="@{/customer/list(page=${customerPage.current - 1}, size=${customerPage.size}, id=${id}, name=${name}, idNumber=${idNumber}, tagName=${tagName})}">&laquo;</a>
                         </li>
                         <li class="page-item" th:each="pageNum : ${#numbers.sequence(startPage, endPage)}" th:classappend="${pageNum == customerPage.current} ? 'active'">
-                            <a class="page-link" th:href="@{/customer/list(page=${pageNum}, size=${customerPage.size})}" th:text="${pageNum}"></a>
+                            <a class="page-link" th:href="@{/customer/list(page=${pageNum}, size=${customerPage.size}, id=${id}, name=${name}, idNumber=${idNumber}, tagName=${tagName})}" th:text="${pageNum}"></a>
                         </li>
                         <li class="page-item" th:classappend="${customerPage.current == customerPage.pages} ? 'disabled'">
-                             <a class="page-link" th:href="@{/customer/list(page=${customerPage.current + 1}, size=${customerPage.size})}">&raquo;</a>
+                             <a class="page-link" th:href="@{/customer/list(page=${customerPage.current + 1}, size=${customerPage.size}, id=${id}, name=${name}, idNumber=${idNumber}, tagName=${tagName})}">&raquo;</a>
                         </li>
                     </ul>
                 </nav>
@@ -104,6 +129,8 @@
 <script th:inline="javascript">
     /* <![CDATA[ */
     document.addEventListener('DOMContentLoaded', function() {
+
+        // --- 页码跳转逻辑 ---
         const jumpButton = document.getElementById('page-jump-button');
         if (jumpButton) {
             jumpButton.addEventListener('click', function() {
@@ -111,15 +138,29 @@
                 const pageNum = parseInt(input.value, 10);
                 const totalPages = /*[[${customerPage.pages}]]*/ 0;
                 const pageSize = /*[[${customerPage.size}]]*/ 10;
+                const customerId = /*[[${id}]]*/ null;
+                const name = /*[[${name}]]*/ null;
+                const idNumber = /*[[${idNumber}]]*/ null;
+                const tagName = /*[[${tagName}]]*/ null;
+
                 if (isNaN(pageNum) || pageNum < 1 || pageNum > totalPages) {
                     alert('请输入一个有效的页码 (1 - ' + totalPages + ')');
                     return;
                 }
-                const baseUrl = /*[[@{/customer/list}]]*/ '/customer/list';
-                window.location.href = baseUrl + '?page=' + pageNum + '&size=' + pageSize;
+
+                let baseUrl = /*[[@{/customer/list}]]*/ '/customer/list';
+                let targetUrl = `${baseUrl}?page=${pageNum}&size=${pageSize}`;
+
+                if (customerId) targetUrl += '&id=' + customerId;
+                if (name) targetUrl += '&name=' + encodeURIComponent(name);
+                if (idNumber) targetUrl += '&idNumber=' + encodeURIComponent(idNumber);
+                if (tagName) targetUrl += '&tagName=' + encodeURIComponent(tagName);
+
+                window.location.href = targetUrl;
             });
         }
 
+        // --- 删除确认模态框逻辑 ---
         const deleteModalElement = document.getElementById('deleteConfirmModal');
         const deleteModal = new bootstrap.Modal(deleteModalElement, {});
         const confirmDeleteBtn = document.getElementById('confirmDeleteButton');
@@ -136,12 +177,27 @@
 
         confirmDeleteBtn.addEventListener('click', function() {
             if (customerIdToDelete) {
-                const form = document.createElement('form');
-                form.method = 'post';
-                form.action = '/customer/delete/' + customerIdToDelete;
-                document.body.appendChild(form);
-                form.submit();
-                document.body.removeChild(form);
+                // 使用 fetch 发送 DELETE 请求到API
+                fetch('/api/customer/delete/' + customerIdToDelete, {
+                    method: 'DELETE'
+                })
+                .then(response => response.json())
+                .then(success => {
+                    if (success) {
+                        alert('删除成功！');
+                        // 成功后刷新当前页面，以显示最新的客户列表
+                        window.location.reload();
+                    } else {
+                        alert('删除失败！');
+                    }
+                })
+                .catch(error => {
+                    console.error('删除客户时发生错误:', error);
+                    alert('删除失败，请查看控制台。');
+                });
+
+                // 关闭模态框
+                deleteModal.hide();
             }
         });
     });
