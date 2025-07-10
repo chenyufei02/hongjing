@@ -11,10 +11,12 @@ import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.util.StringUtils;
-
+import com.whu.hongjing.pojo.vo.ProfitLossVO;
+import java.util.Arrays;
 
 @Service
 public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> implements CustomerService {
@@ -60,32 +62,30 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
      */
     @Override
     public Page<Customer> getCustomerPage(
-            Page<Customer> page, Long customerId,
-            String name, String idNumber, String tagName)
+            Page<Customer> page, Long customerId, String name,
+            String idNumber, String tagName)
     {
         QueryWrapper<Customer> queryWrapper = new QueryWrapper<>();
 
-        // 处理按客户ID的精确查询
-        // 如果传入了 customerId，则其他所有条件都忽略，只按ID查询
         if (customerId != null) {
             queryWrapper.eq("id", customerId);
             return this.page(page, queryWrapper);
         }
 
-        // --- 如果没有传入ID，则处理其他模糊查询和标签查询 ---
-
+        // --- 【【【 核心升级逻辑 】】】 ---
+        // 为了兼容旧的单标签查询和未来的多标签查询，我们统一处理
         if (StringUtils.hasText(tagName)) {
-            QueryWrapper<CustomerTagRelation> tagQuery = new QueryWrapper<>();
-            tagQuery.eq("tag_name", tagName).select("customer_id");
-            List<Long> customerIds = customerTagRelationService.list(tagQuery)
-                    .stream()
-                    .map(CustomerTagRelation::getCustomerId)
-                    .collect(Collectors.toList());
+            // 将单个tagName转换为列表，调用我们新的多标签查询方法
+            List<String> tagList = Arrays.asList(tagName.split(","));
+            List<Long> customerIds = this.findCustomerIdsByTags(tagList);
+
             if (customerIds.isEmpty()) {
+                // 如果根据标签没有找到任何客户，直接返回空结果，避免无效查询
                 return new Page<>(page.getCurrent(), page.getSize(), 0);
             }
             queryWrapper.in("id", customerIds);
         }
+
 
         if (StringUtils.hasText(name)) {
             queryWrapper.like("name", name);
@@ -124,5 +124,22 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
         // 2. 根据找到的 customer_id 列表，一次性查询出所有客户的详细信息
         return this.listByIds(customerIds);
+    }
+
+
+    @Override
+    public Page<ProfitLossVO> getProfitLossPage(Page<ProfitLossVO> page, String customerName, String sortField, String sortOrder) {
+        // 直接调用Mapper中的超级SQL
+        return baseMapper.getProfitLossPage(page, customerName, sortField, sortOrder);
+    }
+
+
+    @Override
+    public List<Long> findCustomerIdsByTags(List<String> tagNames) {
+        if (tagNames == null || tagNames.isEmpty()) {
+            return Collections.emptyList();
+        }
+        // 直接调用Mapper中的高级SQL
+        return baseMapper.findCustomerIdsByTags(tagNames, tagNames.size());
     }
 }

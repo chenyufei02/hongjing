@@ -17,7 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.whu.hongjing.service.FundInfoService;
 import org.springframework.util.StringUtils;
-
 import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -38,6 +37,7 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
 
     /**
      * 根据ID查询持仓情况
+     *
      * @param customerId
      * @return java.util.List<com.whu.hongjing.pojo.entity.CustomerHolding>
      * @author yufei
@@ -52,6 +52,7 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
 
     /**
      * 手动更新用户持仓情况的方法，用于修正持仓表，因为有可能有在自动更新持仓功能之前就已经存进来的数据
+     *
      * @param customerId
      * @return boolean
      * @author yufei
@@ -100,7 +101,7 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
                     // 赎回时，需要知道现在的平均成本来在总成本里赎回份额。因为已经假设了原有的交易有的没被计入到持仓情况表里来，因此
                     // 赎回时的平均成本也不能直接用持仓表里的averageCost字段，因其漏掉了交易 认为不准，重新根据所有交易的总成本与
                     // 总份额计算当前的最新平均成本
-                    if(totalShares.compareTo(BigDecimal.ZERO) > 0) {
+                    if (totalShares.compareTo(BigDecimal.ZERO) > 0) {
                         // 总成本除总份额得到当前买入的平均成本
                         currentAverageCost = totalCost.divide(totalShares, 10, RoundingMode.HALF_UP); // 用更高精度计算当时成本
                     }
@@ -135,6 +136,7 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
 
     /**
      * 处理一笔新交易后自动更新客户持仓
+     *
      * @param
      * @return void
      * @author yufei
@@ -146,7 +148,7 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
         // 1. 查找该客户对该基金是否已有持仓记录
         QueryWrapper<CustomerHolding> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("customer_id", transaction.getCustomerId())
-                    .eq("fund_code", transaction.getFundCode());
+                .eq("fund_code", transaction.getFundCode());
         CustomerHolding holding = this.getOne(queryWrapper);
 
         if (holding == null) { // 如果没有持仓记录，说明是首次购买
@@ -163,7 +165,7 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
             BigDecimal newTotalShares = holding.getTotalShares().add(transaction.getTransactionShares());
             // 新总成本 = (原成本*原份额 + 新交易金额)
             BigDecimal newTotalCost = (holding.getAverageCost().multiply(holding.getTotalShares()))
-                                        .add(transaction.getTransactionAmount());
+                    .add(transaction.getTransactionAmount());
 
             holding.setTotalShares(newTotalShares);
             // 新平均成本 = 新总成本/新总份额
@@ -185,8 +187,7 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
     @Transactional(readOnly = true) // 使用只读事务，提高查询性能
     public Page<CustomerHoldingVO> getHoldingPage(
             Page<CustomerHoldingVO> page, String customerName,
-            String fundCode, String sortField, String sortOrder)
-    {
+            String fundCode, String sortField, String sortOrder) {
         // --- 步骤 1: 根据查询条件，筛选出符合条件的客户ID和基金代码 ---
         List<Long> customerIds = null;
         if (StringUtils.hasText(customerName)) {
@@ -280,4 +281,5 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
         page.setTotal(holdingPage.getTotal());
         return page;
     }
+
 }

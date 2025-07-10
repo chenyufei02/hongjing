@@ -13,39 +13,32 @@
 <div class="main-content">
     <div class="container-fluid">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="h4">标签看板</h2>
+            <h2 class="h4">标签看板与组合查询</h2>
             <div>
                  <button id="refresh-all-tags-btn" class="btn btn-warning">一键刷新全量标签</button>
             </div>
         </div>
 
         <div class="card mb-4">
+            <div class="card-header fw-bold">
+                高级组合查询
+            </div>
             <div class="card-body">
-                <form class="row g-3 align-items-center" th:action="@{/tag/list}" method="get">
-                    <div class="col-md-4">
-                        <label for="category" class="visually-hidden">按标签类别筛选</label>
-                        <select class="form-select" id="category" name="category">
-                            <option value="">查看所有类别...</option>
-                            <option th:each="cat : ${allCategories}"
-                                    th:value="${cat}"
-                                    th:text="${cat}"
-                                    th:selected="${cat == selectedCategory}"></option>
-                        </select>
+                <p class="card-text text-muted">请在下方不同类别中选择一个或多个标签，然后点击“查询匹配的客户”按钮，系统将找出同时拥有您所选全部标签的客户群体。</p>
+                <div id="combo-query-form" class="row g-3">
                     </div>
-                    <div class="col-auto">
-                        <button type="submit" class="btn btn-primary">筛选</button>
-                    </div>
-                    <div class="col-auto">
-                        <a th:href="@{/tag/list}" class="btn btn-outline-secondary">重置</a>
-                    </div>
-                </form>
+                <hr>
+                <div class="d-flex justify-content-end align-items-center">
+                     <button id="reset-query-btn" class="btn btn-outline-secondary me-2">重置选择</button>
+                     <button id="submit-query-btn" class="btn btn-primary">查询匹配的客户</button>
+                </div>
             </div>
         </div>
 
 
         <div class="card">
             <div class="card-header">
-                标签统计列表
+                标签统计总览 (点击下方标签可快速跳转到对应客户列表)
             </div>
             <div class="card-body">
                  <div th:if="${#maps.isEmpty(groupedTags)}" class="text-center p-4">
@@ -55,20 +48,14 @@
                      <div th:each="entry : ${groupedTags}" th:if="${not #lists.isEmpty(entry.value)}"
                      th:class="${entry.key == '职业'} ? 'col-md-12 mb-4' : 'col-md-6 mb-4'">
                         <div class="card h-100">
-                            <div class="card-header fw-bold" th:text="${entry.key}">
-                                标签类别
+                            <div class="card-header fw-bold" th:text="${entry.key}"></div>
+                            <div class="card-body">
+                                <a th:each="tag : ${entry.value}"
+                                        class="btn btn-outline-secondary btn-sm m-1"
+                                        th:href="@{/customer/list(tagName=${tag.tagName})}"
+                                        th:text="${tag.tagName} + ' (' + ${tag.customerCount} + '人)'">
+                                </a>
                             </div>
-                            <ul class="list-group list-group-flush">
-                                <li th:each="tag : ${entry.value}" class="list-group-item d-flex justify-content-between align-items-center">
-                                    <span th:text="${tag.tagName}">标签名称</span>
-                                    <div>
-                                        <span class="badge bg-primary rounded-pill me-3" th:text="${tag.customerCount} + ' 人'"></span>
-                                        <a class="btn btn-sm btn-outline-primary" th:href="@{/customer/list(tagName=${tag.tagName})}">
-                                            查看客户
-                                        </a>
-                                    </div>
-                                </li>
-                            </ul>
                         </div>
                     </div>
                 </div>
@@ -80,69 +67,94 @@
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
     <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
         <div class="toast-header">
-            <svg class="bd-placeholder-img rounded me-2" width="20" height="20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" preserveAspectRatio="xMidYMid slice" focusable="false"><rect width="100%" height="100%" fill="#007aff"></rect></svg>
             <strong class="me-auto" id="toast-title">系统通知</strong>
             <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
-        <div class="toast-body" id="toast-body">
-            这是提示内容。
-        </div>
+        <div class="toast-body" id="toast-body"></div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const refreshBtn = document.getElementById('refresh-all-tags-btn');
+<script th:inline="javascript">
+    /* <![CDATA[ */
+    document.addEventListener('DOMContentLoaded', function() {
+        const groupedTags = /*[[${groupedTags}]]*/ {};
+        const formContainer = document.getElementById('combo-query-form');
+        const submitBtn = document.getElementById('submit-query-btn');
+        const resetBtn = document.getElementById('reset-query-btn');
 
-    const toastElement = document.getElementById('liveToast');
-    const toast = new bootstrap.Toast(toastElement);
-    const toastTitle = document.getElementById('toast-title');
-    const toastBody = document.getElementById('toast-body');
+        // --- 核心逻辑：动态生成所有下拉框 ---
+        for (const category in groupedTags) {
+            if (groupedTags.hasOwnProperty(category) && groupedTags[category].length > 0) {
+                const col = document.createElement('div');
+                col.className = 'col-md-3';
+                const select = document.createElement('select');
+                select.className = 'form-select combo-select';
+                // 为每个下拉框创建一个唯一的ID，例如 'select-职业'
+                select.id = 'select-' + category;
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = '选择 ' + category + '...';
+                select.appendChild(defaultOption);
 
-    if(refreshBtn) {
-        refreshBtn.addEventListener('click', function() {
-            if (!confirm('这将为所有客户重新计算画像标签，根据客户数量，可能需要一些时间。确定要开始吗？')) {
+                groupedTags[category].forEach(tag => {
+                    const option = document.createElement('option');
+                    option.value = tag.tagName;
+                    option.textContent = tag.tagName;
+                    select.appendChild(option);
+                });
+                col.appendChild(select);
+                formContainer.appendChild(col);
+            }
+        }
+
+        // --- “高级查询”面板的按钮事件监听 ---
+        resetBtn.addEventListener('click', function() {
+            document.querySelectorAll('.combo-select').forEach(select => select.value = '');
+        });
+
+        submitBtn.addEventListener('click', function() {
+            const selectedTags = [];
+            document.querySelectorAll('.combo-select').forEach(select => {
+                if (select.value) {
+                    selectedTags.push(select.value);
+                }
+            });
+            if (selectedTags.length === 0) {
+                alert('请至少选择一个标签进行组合查询！');
                 return;
             }
-
-            // 步骤1：立刻显示“任务启动中”的提示，这是一个中性的、即时的反馈
-            toastTitle.textContent = '⏳ 任务启动中...';
-            toastBody.textContent = '已向后台发送全量标签刷新指令。';
-            // 使用一个中性的蓝色，而不是之前的绿色
-            toastElement.className = 'toast text-bg-primary'; // 直接重置class
-            toast.show();
+            const tagNameQuery = selectedTags.join(',');
+            const targetUrl = /*[[@{/customer/list}]]*/ '/customer/list' + '?tagName=' + encodeURIComponent(tagNameQuery);
+            window.location.href = targetUrl;
+        });
 
 
-            // 步骤2：在后台发送API请求，并只在【发生失败时】才弹出新的提示
-            fetch('/tags/refresh-all', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    if (!data.success) {
-                        // 【【【 关键修正 】】】
-                        // 如果API返回了失败信息，则弹出一个【失败】的Toast
-                        toastTitle.textContent = '❌ 任务启动失败';
-                        toastBody.textContent = data.message;
+        // --- “一键刷新”的Toast和全量刷新逻辑 ---
+        const refreshBtn = document.getElementById('refresh-all-tags-btn');
+        const toastElement = document.getElementById('liveToast');
+        const toast = new bootstrap.Toast(toastElement);
+        const toastTitle = document.getElementById('toast-title');
+        const toastBody = document.getElementById('toast-body');
+
+        if(refreshBtn) {
+            refreshBtn.addEventListener('click', function() {
+                if (!confirm('这将为所有客户重新计算画像标签...')) return;
+                toastTitle.textContent = '⏳ 任务启动中...';
+                toastBody.textContent = '已向后台发送全量标签刷新指令。';
+                toastElement.className = 'toast text-bg-primary';
+                toast.show();
+                fetch('/tags/refresh-all', { method: 'POST' })
+                    .then(r => r.json()).then(d => { if(!d.success) throw new Error(d.message); }).catch(e => {
+                        toastTitle.textContent = '❌ 启动失败';
+                        toastBody.textContent = e.message;
                         toastElement.className = 'toast text-bg-danger';
                         toast.show();
-                        console.error('后台任务启动失败：' + data.message);
-                    } else {
-                        // 如果API返回成功，我们只需要在控制台记录一下即可，不再打扰用户
-                        console.log('后台任务启动成功。');
-                    }
-                })
-                .catch(error => {
-                    // 【【【 关键修正 】】】
-                    // 如果发生网络错误，则弹出一个【网络错误】的Toast
-                    toastTitle.textContent = '❌ 网络错误';
-                    toastBody.textContent = '无法连接到服务器，请查看控制台获取更多信息。';
-                    toastElement.className = 'toast text-bg-danger';
-                    toast.show();
-                    console.error('触发标签刷新时发生网络错误:', error);
                 });
-        });
-    }
-});
+            });
+        }
+    });
+    /* ]]> */
 </script>
 
 </body>

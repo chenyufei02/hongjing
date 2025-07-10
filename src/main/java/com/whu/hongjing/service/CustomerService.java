@@ -1,6 +1,6 @@
 package com.whu.hongjing.service;
-
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.whu.hongjing.pojo.vo.ProfitLossVO;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.whu.hongjing.pojo.entity.Customer;
 import java.util.List;
@@ -24,4 +24,15 @@ public interface CustomerService extends IService<Customer>{
     List<Customer> getCustomersByName(String name);
 
     List<Customer> getCustomersByTag(String tagName);
+
+    Page<ProfitLossVO> getProfitLossPage(
+            Page<ProfitLossVO> page, String customerName, String sortField, String sortOrder);
+
+    /**
+     * 【新增】根据多个标签名，找出同时拥有这些标签的所有客户ID
+     * @param tagNames 标签名称列表
+     * @return 符合条件的客户ID列表
+     */
+    List<Long> findCustomerIdsByTags(List<String> tagNames);
+
 }

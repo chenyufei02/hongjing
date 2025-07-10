@@ -42,8 +42,12 @@
         <li class="nav-item">
             <a class="nav-link" th:classappend="${activeUri == '/tag/list' ? 'active' : ''}" th:href="@{/tag/list}">标签管理</a>
         </li>
-        <li class="nav-item"><a class="nav-link" href="#">盈亏管理</a></li>
-        <li class="nav-item"><a class="nav-link" href="#">可视化画像</a></li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeUri == '/profitloss/list' ? 'active' : ''}" th:href="@{/profitloss/list}">盈亏管理</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" th:classappend="${activeUri == '/visualization/dashboard' ? 'active' : ''}" th:href="@{/visualization/dashboard}">可视化画像</a>
+        </li>
     </ul>
 </div>
 

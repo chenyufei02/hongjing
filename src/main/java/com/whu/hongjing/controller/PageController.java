@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import com.whu.hongjing.pojo.dto.CustomerDTO;
-
+import com.whu.hongjing.pojo.vo.ProfitLossVO;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -436,9 +436,62 @@ public class PageController {
     }
 
 
+    /**
+     * 【修正版】显示可视化画像仪表盘页面
+     */
+    @GetMapping("/visualization/dashboard")
+    public String showDashboard(Model model) {
+        model.addAttribute("activeUri", "/visualization/dashboard");
+        // 【【【 关键修正 】】】
+        // 确保这里返回的是正确的页面路径
+        return "visualization/dashboard";
+    }
 
+    /**
+     * 【最终性能版】显示客户盈亏排行榜页面（支持分页、搜索、多字段排序）
+     */
+    @GetMapping("/profitloss/list")
+    public String profitLossList(Model model,
+                                 @RequestParam(value = "page", defaultValue = "1") int pageNum,
+                                 @RequestParam(value = "size", defaultValue = "10") int pageSize,
+                                 @RequestParam(required = false) String customerName,
+                                 @RequestParam(required = false) String sortField,
+                                 @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
 
+        Page<ProfitLossVO> page = new Page<>(pageNum, pageSize);
 
+        // 【【【 关键安全升级 】】】
+        // 创建一个允许的排序列名白名单
+        List<String> allowedSortFields = List.of("customerId", "totalMarketValue", "totalProfitLoss", "profitLossRate");
+        String dbSortField = null;
+        if (sortField != null && allowedSortFields.contains(sortField)) {
+            dbSortField = sortField;
+        }
+
+        // 调用我们全新的、基于数据库计算的、高性能的服务方法
+        customerService.getProfitLossPage(page, customerName, dbSortField, sortOrder);
+
+        // ... (分页导航栏计算逻辑等，保持完全不变) ...
+        int startPage = 1, endPage = (int) page.getPages();
+        if (page.getPages() > 5) {
+            startPage = Math.max(1, (int)page.getCurrent() - 2);
+            endPage = Math.min((int)page.getPages(), startPage + 4);
+            if (endPage == page.getPages()) {
+                startPage = Math.max(1, endPage - 4);
+            }
+        }
+
+        model.addAttribute("statsPage", page);
+        model.addAttribute("startPage", startPage);
+        model.addAttribute("endPage", endPage);
+        model.addAttribute("activeUri", "/profitloss/list");
+        model.addAttribute("customerName", customerName);
+        model.addAttribute("sortField", sortField);
+        model.addAttribute("sortOrder", sortOrder);
+        model.addAttribute("reversedSortOrder", "asc".equals(sortOrder) ? "desc" : "asc");
+
+        return "profitloss/list";
+    }
 
 
 

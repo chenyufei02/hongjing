@@ -7,6 +7,7 @@ import java.util.List;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.whu.hongjing.pojo.vo.CustomerHoldingVO;
 
+
 public interface CustomerHoldingService extends IService<CustomerHolding> {
 
     // 我们定义一个接口，用于根据客户ID查询其所有持仓
@@ -28,5 +29,6 @@ public interface CustomerHoldingService extends IService<CustomerHolding> {
     Page<CustomerHoldingVO> getHoldingPage(
             Page<CustomerHoldingVO> page, String customerName,
             String fundCode, String sortField, String sortOrder);
+
 
 }

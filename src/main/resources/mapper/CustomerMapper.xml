@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.whu.hongjing.mapper.CustomerMapper">
+
+    <select id="getProfitLossPage" resultType="com.whu.hongjing.pojo.vo.ProfitLossVO">
+        SELECT
+            c.id as customerId,
+            c.name as customerName,
+            IFNULL(inv.total_investment, 0) as totalInvestment,
+            IFNULL(mv.total_market_value, 0) as totalMarketValue,
+            (IFNULL(mv.total_market_value, 0) - IFNULL(inv.total_investment, 0)) as totalProfitLoss,
+            IF(IFNULL(inv.total_investment, 0) > 0, ((IFNULL(mv.total_market_value, 0) - IFNULL(inv.total_investment, 0)) / inv.total_investment) * 100, 0) as profitLossRate
+        FROM
+            customer c
+        LEFT JOIN (
+            SELECT
+                customer_id,
+                SUM(CASE WHEN transaction_type = '申购' THEN transaction_amount ELSE -transaction_amount END) as total_investment
+            FROM fund_transaction
+            GROUP BY customer_id
+        ) inv ON c.id = inv.customer_id
+        LEFT JOIN (
+            SELECT
+                customer_id,
+                SUM(market_value) as total_market_value
+            FROM customer_holding
+            GROUP BY customer_id
+        ) mv ON c.id = mv.customer_id
+        <where>
+            <if test="customerName != null and customerName != ''">
+                c.name LIKE CONCAT('%', #{customerName}, '%')
+            </if>
+        </where>
+        <if test="sortField != null and sortField != ''">
+            ORDER BY ${sortField} ${sortOrder}
+        </if>
+        <if test="sortField == null or sortField == ''">
+            ORDER BY totalProfitLoss DESC
+        </if>
+    </select>
+
+
+<!--  多标签查询  -->
+    <select id="findCustomerIdsByTags" resultType="long">
+        SELECT customer_id
+        FROM customer_tag_relation
+        WHERE tag_name IN
+        <foreach item="tagName" collection="tagNames" open="(" separator="," close=")">
+            #{tagName}
+        </foreach>
+        GROUP BY customer_id
+        HAVING COUNT(DISTINCT tag_name) = #{tagCount}
+    </select>
+
+</mapper>

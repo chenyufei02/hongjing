@@ -34,8 +34,11 @@ public class CustomerTagRelationServiceImpl extends ServiceImpl<CustomerTagRelat
         );
 
         // 步骤3：根据我们的规则，对标签进行排序
-        unsortedTags.sort(Comparator.comparing(tag -> categoryOrder.indexOf(tag.getTagCategory())));
-
+        unsortedTags.sort(Comparator.comparing(tag -> {
+            int index = categoryOrder.indexOf(tag.getTagCategory());
+            return index == -1 ? Integer.MAX_VALUE : index; // 将未找到的类别排在最后
+        }));
         return unsortedTags;
     }
+
 }

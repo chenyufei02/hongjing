@@ -54,6 +54,7 @@
                 <table class="table table-hover">
                     <thead>
                     <tr>
+                        <th>操作</th>
                         <th>
                             <a class="table-sort-link" th:href="@{/holding/list(page=${holdingPage.current}, size=${holdingPage.size}, customerName=${customerName}, fundCode=${fundCode}, sortField='customerId', sortOrder=${sortField == 'customerId' ? reversedSortOrder : 'asc'})}">
                                 客户姓名 (ID)
@@ -75,6 +76,10 @@
 
                     <tbody>
                         <tr th:if="${not #lists.isEmpty(holdingPage.records)}" th:each="holding : ${holdingPage.records}">
+                            <td>
+                                <a class="btn btn-sm btn-outline-primary" th:href="
+                                @{/customer/detail/{id}(id=${holding.customerId})}">查看详情</a>
+                            </td>
                             <td>
                                 <div th:text="${holding.customerName}">客户名称</div>
                                 <small class="text-muted" th:text="'ID: ' + ${holding.customerId}"></small>

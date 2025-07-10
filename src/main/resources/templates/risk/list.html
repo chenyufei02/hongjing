@@ -52,6 +52,7 @@
                 <table class="table table-hover">
                     <thead>
                     <tr>
+                        <th>操作</th>
                         <th>
                             <a class="table-sort-link" th:href="@{/risk/list(page=${assessmentPage.current}, size=${assessmentPage.size}, customerName=${customerName}, riskLevel=${riskLevel}, sortField='customerId', sortOrder=${sortField == 'customerId' ? reversedSortOrder : 'asc'})}">
                                 客户姓名 (ID)
@@ -77,6 +78,10 @@
 
                     <tbody>
                     <tr th:if="${not #lists.isEmpty(assessmentPage.records)}" th:each="assessment : ${assessmentPage.records}">
+                        <td>
+                            <a class="btn btn-sm btn-outline-primary" th:href="
+                            @{/customer/detail/{id}(id=${assessment.customerId})}">查看详情</a>
+                        </td>
                         <td>
                             <div th:text="${assessment.customerName}"></div>
                             <small class="text-muted" th:text="'ID: ' + ${assessment.customerId}"></small>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:replace="~{layout :: common_head('可视化画像', ~{})}" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .chart-card {
+            min-height: 380px;
+        }
+    </style>
+</head>
+<body>
+
+<div th:replace="~{layout :: navbar}"></div>
+<div th:replace="~{layout :: sidebar(${activeUri})}"></div>
+
+<div class="main-content">
+    <div class="container-fluid">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="h4">客户画像仪表盘</h2>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header fw-bold">
+                全局筛选器
+            </div>
+            <div class="card-body">
+                <p class="card-text text-muted">请在下方选择一个或多个标签，然后点击“应用筛选”按钮，下方所有图表都将根据您选择的客户群体进行更新。</p>
+                <div id="filter-form-container" class="row g-3">
+                    </div>
+                <hr>
+                <div class="d-flex justify-content-end align-items-center">
+                     <button id="reset-filters-btn" class="btn btn-outline-secondary me-2">重置筛选</button>
+                     <button id="apply-filters-btn" class="btn btn-primary">应用筛选</button>
+                </div>
+            </div>
+        </div>
+
+
+        <div id="dashboard-container" class="row g-4">
+            <div id="loading-indicator" class="text-center p-5">
+                <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+                <p class="mt-2">正在加载图表数据...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dashboardContainer = document.getElementById('dashboard-container');
+    const loadingIndicator = document.getElementById('loading-indicator');
+    const filterFormContainer = document.getElementById('filter-form-container');
+    const applyFiltersBtn = document.getElementById('apply-filters-btn');
+    const resetFiltersBtn = document.getElementById('reset-filters-btn');
+
+    let allChartInstances = []; // 用来存放所有图表实例，方便后续更新或销毁
+    let originalData = {}; // 用来缓存从后端获取的原始数据
+
+    // --- 核心函数：根据数据绘制所有图表 ---
+    function renderDashboard(statsData) {
+        // 清空旧的图表和实例
+        dashboardContainer.innerHTML = '';
+        allChartInstances.forEach(chart => chart.destroy());
+        allChartInstances = [];
+
+        for (const category in statsData) {
+            if (statsData.hasOwnProperty(category) && statsData[category].length > 0) {
+                const data = statsData[category];
+                const chartWrapper = document.createElement('div');
+                chartWrapper.className = (category === '职业') ? 'col-12' : 'col-lg-4 col-md-6';
+
+                const card = document.createElement('div');
+                card.className = 'card chart-card mb-4';
+                const cardBody = document.createElement('div');
+                cardBody.className = 'card-body d-flex justify-content-center align-items-center';
+                const canvas = document.createElement('canvas');
+                cardBody.appendChild(canvas);
+                card.appendChild(cardBody);
+                chartWrapper.appendChild(card);
+                dashboardContainer.appendChild(chartWrapper);
+
+                const config = getChartConfig(category, data);
+                allChartInstances.push(new Chart(canvas, config));
+            }
+        }
+    }
+
+    // --- 核心函数：生成图表配置 ---
+    function getChartConfig(category, data) {
+        const labels = data.map(item => item.tagName);
+        const counts = data.map(item => item.customerCount);
+        const colors = ['rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)', 'rgba(255, 206, 86, 0.7)', 'rgba(75, 192, 192, 0.7)', 'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)'];
+        let chartType = 'pie';
+        let chartOptions = {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'top' }, title: { display: true, text: category, font: { size: 16 } } }
+        };
+        if (category === '职业') { chartType = 'bar'; chartOptions.indexAxis = 'y'; }
+        return {
+            type: chartType,
+            data: {
+                labels: labels,
+                datasets: [{ label: '客户数量', data: counts, backgroundColor: colors, borderWidth: 1 }]
+            },
+            options: chartOptions
+        };
+    }
+
+    // --- 页面初始化：获取数据并渲染 ---
+    fetch('/api/dashboard/all-stats')
+        .then(response => response.json())
+        .then(stats => {
+            loadingIndicator.remove();
+            originalData = stats; // 缓存原始数据
+            renderDashboard(originalData); // 首次渲染
+
+            // --- 根据获取的数据，动态生成筛选下拉框 ---
+            for (const category in originalData) {
+                 if (originalData.hasOwnProperty(category) && originalData[category].length > 0) {
+                    const col = document.createElement('div');
+                    col.className = 'col-md-3';
+                    const select = document.createElement('select');
+                    select.className = 'form-select filter-select';
+                    select.dataset.category = category;
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = '';
+                    defaultOption.textContent = '筛选 ' + category + '...';
+                    select.appendChild(defaultOption);
+                    originalData[category].forEach(tag => {
+                        const option = document.createElement('option');
+                        option.value = tag.tagName;
+                        option.textContent = tag.tagName;
+                        select.appendChild(option);
+                    });
+                    col.appendChild(select);
+                    filterFormContainer.appendChild(col);
+                 }
+            }
+        })
+        .catch(error => {
+            console.error('加载仪表盘数据时发生错误:', error);
+            loadingIndicator.innerHTML = '<p class="text-danger">数据加载失败！</p>';
+        });
+
+    // --- 筛选按钮逻辑 ---
+    applyFiltersBtn.addEventListener('click', function() {
+        // 在这里，我们需要一个新的后端API来处理筛选逻辑
+        // 作为一个临时方案，我们可以在前端模拟筛选，但这在真实场景中不准确
+        // 这是一个更高级的功能，需要我们后续再专门开发后端API
+        alert('“应用筛选”功能需要专门的后端API支持，我们将在下一个版本中实现这个高级功能！现在，您可以先浏览完整的画像数据。');
+    });
+
+    // --- 重置按钮逻辑 ---
+    resetFiltersBtn.addEventListener('click', function() {
+        document.querySelectorAll('.filter-select').forEach(select => select.value = '');
+        // 重置时可以重新渲染原始图表
+        renderDashboard(originalData);
+    });
+});
+</script>
+
+</body>
+</html>
