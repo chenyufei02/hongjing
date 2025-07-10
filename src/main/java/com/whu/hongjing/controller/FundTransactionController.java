@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/fund-transaction")
+@RequestMapping("/api/fund-transaction")
 @Tag(name = "基金交易记录管理", description = "提供基金交易的记录和查询接口")
 public class FundTransactionController {
 

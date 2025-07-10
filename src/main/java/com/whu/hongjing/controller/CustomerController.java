@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
  */
 @RestController // 【关键修改】使用 @RestController，表明此类所有方法都返回数据，而非视图。
 @RequestMapping("/api/customer") // 【关键修改】为所有API路径统一添加 /api 前缀，方便管理和部署。
-@Tag(name = "客户管理API", description = "客户相关增删改查的数据接口")
+@Tag(name = "客户管理", description = "客户相关增删改查的数据接口")
 public class CustomerController {
 
     @Autowired

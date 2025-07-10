@@ -17,5 +17,9 @@ springdoc:
     path: /swagger-ui.html
     enabled: true
   show-actuator: true
+  # 配置下面这项主要是为了不要把pagecontroller类和其下面的方法自动识别为要测试的接口
+  #（因为这个类是从前端开始访问的完整流程的测试，我们只用测试后端API，前后端联调直接在网页交互测试）
+  paths-to-match:
+    - /api/** # 匹配所有以 /api/ 开头的接口 (CustomerController, DashboardController等等纯后端接口)
 
 # mybatis-plus的配置已经移到 application-dev.yml 中了

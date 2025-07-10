@@ -129,7 +129,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             // 使用mock-data控制器中的手动触发接口
-            fetch('/mock-data/trigger-daily-update', { method: 'POST' })
+            fetch('/api/mock-data/trigger-daily-update', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {

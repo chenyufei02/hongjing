@@ -30,4 +30,7 @@ public interface CustomerMapper extends BaseMapper<Customer> {
             @Param("tagNames") List<String> tagNames, @Param("tagCount") int tagCount);
 
 
+    ProfitLossVO getProfitLossVOByCustomerId(@Param("customerId") Long customerId);
+
+
 }

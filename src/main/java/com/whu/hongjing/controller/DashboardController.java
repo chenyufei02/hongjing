@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/dashboard")
-@Tag(name = "可视化画像数据API", description = "为前端仪表盘提供图表数据")
+@Tag(name = "可视化画像数据", description = "为前端仪表盘提供图表数据")
 public class DashboardController {
 
     @Autowired

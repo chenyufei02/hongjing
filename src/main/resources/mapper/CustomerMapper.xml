@@ -51,4 +51,34 @@
         HAVING COUNT(DISTINCT tag_name) = #{tagCount}
     </select>
 
+
+    <select id="getProfitLossVOByCustomerId" resultType="com.whu.hongjing.pojo.vo.ProfitLossVO">
+        SELECT
+            c.id as customerId,
+            c.name as customerName,
+            IFNULL(inv.total_investment, 0) as totalInvestment,
+            IFNULL(mv.total_market_value, 0) as totalMarketValue,
+            (IFNULL(mv.total_market_value, 0) - IFNULL(inv.total_investment, 0)) as totalProfitLoss,
+            IF(IFNULL(inv.total_investment, 0) > 0, ((IFNULL(mv.total_market_value, 0) - IFNULL(inv.total_investment, 0)) / inv.total_investment) * 100, 0) as profitLossRate
+        FROM
+            customer c
+        LEFT JOIN (
+            SELECT
+                customer_id,
+                SUM(CASE WHEN transaction_type = '申购' THEN transaction_amount ELSE 0 END) as total_investment
+            FROM fund_transaction
+            WHERE customer_id = #{customerId}
+            GROUP BY customer_id
+        ) inv ON c.id = inv.customer_id
+        LEFT JOIN (
+            SELECT
+                customer_id,
+                SUM(market_value) as total_market_value
+            FROM customer_holding
+            WHERE customer_id = #{customerId}
+            GROUP BY customer_id
+        ) mv ON c.id = mv.customer_id
+        WHERE c.id = #{customerId}
+    </select>
+
 </mapper>

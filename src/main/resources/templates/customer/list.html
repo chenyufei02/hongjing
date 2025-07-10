@@ -221,7 +221,7 @@
                 toastBody.textContent = '正在为客户 ' + customerId + ' 更新标签...';
                 toastElement.className = 'toast text-bg-info';
                 toast.show();
-                fetch('/tags/refresh/' + customerId, { method: 'POST' })
+                fetch('/api/tags/refresh/' + customerId, { method: 'POST' })
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {

@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 
 @RestController
-@RequestMapping("/tags")
+@RequestMapping("/api/tags")
 @Tag(name = "客户标签管理", description = "提供标签的刷新与查询接口")
 public class TagController {
 

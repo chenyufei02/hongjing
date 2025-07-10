@@ -18,6 +18,7 @@ import org.springframework.util.StringUtils;
 import com.whu.hongjing.pojo.vo.ProfitLossVO;
 import java.util.Arrays;
 
+
 @Service
 public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> implements CustomerService {
 
@@ -142,4 +143,12 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         // 直接调用Mapper中的高级SQL
         return baseMapper.findCustomerIdsByTags(tagNames, tagNames.size());
     }
+
+
+    @Override
+    public ProfitLossVO getProfitLossVO(Long customerId) {
+        return baseMapper.getProfitLossVOByCustomerId(customerId);
+    }
+
+
 }

@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/risk-assessment")
+@RequestMapping("/api/risk-assessment")
 @Tag(name = "客户风险评估管理", description = "提供客户风险评估的记录和查询接口")
 public class RiskAssessmentController {
 

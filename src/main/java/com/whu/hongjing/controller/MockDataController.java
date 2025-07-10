@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/mock-data")
+@RequestMapping("/api/mock-data")
 @Tag(name = "测试数据生成工具", description = "用于生成和刷新各类模拟数据的接口")
 public class MockDataController {
 

@@ -15,7 +15,7 @@ import com.whu.hongjing.service.FundDataImportService;
 import java.util.List;
 
 @RestController
-@RequestMapping("/fund-info")
+@RequestMapping("/api/fund-info")
 @Tag(name = "基金信息管理", description = "提供基金信息的增删改查接口")
 public class FundInfoController {
 

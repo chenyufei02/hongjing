@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/customer-holding")
+@RequestMapping("/api/customer-holding")
 @Tag(name = "客户持仓管理", description = "提供客户持仓的查询接口")
 public class CustomerHoldingController {
 

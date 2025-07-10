@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 toast.show();
 
                 // 2. 发起一个可能会长时间等待的请求
-                fetch('/tags/refresh-all', { method: 'POST' })
+                fetch('/api/tags/refresh-all', { method: 'POST' })
                     .then(response => {
                         if (!response.ok) { // 处理网络或服务器错误
                             return response.json().then(err => Promise.reject(err));

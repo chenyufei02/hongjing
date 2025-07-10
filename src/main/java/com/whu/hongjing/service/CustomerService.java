@@ -35,4 +35,14 @@ public interface CustomerService extends IService<Customer>{
      */
     List<Long> findCustomerIdsByTags(List<String> tagNames);
 
+
+    // --- 【【【 新增方法声明 】】】 ---
+    /**
+     * 根据客户ID，获取该客户的盈亏统计信息
+     * @param customerId 客户ID
+     * @return 客户的盈亏视图对象
+     */
+    ProfitLossVO getProfitLossVO(Long customerId);
+
+
 }

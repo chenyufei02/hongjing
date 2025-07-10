@@ -3,6 +3,33 @@
 
 <head>
     <th:block th:replace="~{layout :: common_head('客户详情', ~{})}" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        .metric-card { border-left-width: 4px; border-radius: .35rem; }
+        .metric-card .card-body { padding: 1.5rem; }
+        .metric-card-profit { border-left-color: #d32f2f; }
+        .metric-card-loss { border-left-color: #388e3c; }
+        .metric-card-neutral { border-left-color: #0d6efd; }
+        .metric-card-asset { border-left-color: #ffc107; }
+
+        .text-profit { color: #d32f2f; }
+        .text-loss { color: #388e3c; }
+
+        .tag-badge { color: #fff; background-color: #6c757d; margin: 0 8px 8px 0; padding: 0.5em 0.75em; font-size: 0.9rem; font-weight: 500; display: inline-block;}
+        .tag-cat-asset { background-color: #ffb300; color: #000; }
+        .tag-cat-style { background-color: #0d47a1; }
+        .tag-cat-recency { background-color: #00897b; }
+        .tag-cat-frequency { background-color: #00acc1; }
+        .tag-cat-gender, .tag-cat-occupation, .tag-cat-age { background-color: #546e7a; }
+        .tag-cat-risk-declared { background-color: #5e35b1; }
+        .tag-cat-risk-actual { background-color: #fb8c00; }
+        .tag-cat-risk-diagnosis-match { background-color: #43a047; }
+        .tag-cat-risk-diagnosis-overweight { background-color: #e53935; }
+        .tag-cat-risk-diagnosis-underweight { background-color: #1e88e5; }
+        .tag-cat-investment-behavior { background-color: #3949ab; }
+
+        .tag-group-title { font-weight: 600; color: #666; margin-bottom: 0.75rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: .5px;}
+    </style>
 </head>
 
 <body>
@@ -17,41 +44,174 @@
             <a th:href="${backUrl}" class="btn btn-secondary">返回列表</a>
         </div>
 
-        <div class="card mb-4">
-            <div class="card-header">基础信息</div>
-            <div class="card-body">
-                <div class="row" th:object="${customer}">
-                    <div class="col-md-4"><strong>客户ID:</strong> <span th:text="*{id}"></span></div>
-                    <div class="col-md-4"><strong>姓名:</strong> <span th:text="*{name}"></span></div>
-                    <div class="col-md-4"><strong>性别:</strong> <span th:text="*{gender}"></span></div>
-                    <div class="col-md-4 mt-3"><strong>证件类型:</strong> <span th:text="*{idType}"></span></div>
-                    <div class="col-md-4 mt-3"><strong>证件号码:</strong> <span th:text="*{idNumber}"></span></div>
-                    <div class="col-md-4 mt-3"><strong>出生日期:</strong> <span th:text="*{birthDate}"></span></div>
-                    <div class="col-md-4 mt-3"><strong>国籍:</strong> <span th:text="*{nationality}"></span></div>
-                    <div class="col-md-4 mt-3"><strong>职业:</strong> <span th:text="*{occupation}"></span></div>
-                    <div class="col-md-4 mt-3"><strong>手机号:</strong> <span th:text="*{phone}"></span></div>
-                    <div class="col-md-12 mt-3"><strong>联系地址:</strong> <span th:text="*{address}"></span></div>
+        <div class="row">
+            <div class="col-lg-5 mb-4">
+                <div class="card h-100">
+                    <div class="card-header fw-bold"><i class="bi bi-person-lines-fill me-2"></i>基础信息</div>
+                    <div class="card-body">
+                        <div class="row" th:object="${customer}">
+                            <div class="col-md-6 mb-3"><strong>客户ID:</strong> <span th:text="*{id}"></span></div>
+                            <div class="col-md-6 mb-3"><strong>姓名:</strong> <span th:text="*{name}"></span></div>
+                            <div class="col-md-6 mb-3"><strong>性别:</strong> <span th:text="*{gender}"></span></div>
+                            <div class="col-md-6 mb-3"><strong>出生日期:</strong> <span th:text="*{birthDate}"></span></div>
+                            <div class="col-md-6 mb-3"><strong>职业:</strong> <span th:text="*{occupation}"></span></div>
+                            <div class="col-md-6 mb-3"><strong>手机号:</strong> <span th:text="*{phone}"></span></div>
+                            <div class="col-md-12 mb-3"><strong>证件号码:</strong> <span th:text="*{idNumber}"></span></div>
+                            <div class="col-md-12"><strong>联系地址:</strong> <span th:text="*{address}"></span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-7 mb-4">
+                <div class="card h-100">
+                    <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-tags-fill me-2"></i>画像标签云</span>
+                        <button class="btn btn-warning btn-sm" id="refresh-single-tag-btn" th:data-customer-id="${customer.id}">
+                            <i class="bi bi-arrow-clockwise"></i> 刷新标签
+                        </button>
+                    </div>
+                     <div class="card-body p-4">
+                        <div class="row mb-3">
+                            <div class="col-md-4 border-end">
+                                <h6 class="tag-group-title">基础画像</h6>
+                                <span th:each="tag : ${basicProfileTags}" class="badge tag-badge" th:text="${tag.tagName}" th:classappend="${tag.tagCategory == T(com.whu.hongjing.constants.TaggingConstants).CATEGORY_GENDER ? 'tag-cat-gender' : (tag.tagCategory == T(com.whu.hongjing.constants.TaggingConstants).CATEGORY_OCCUPATION ? 'tag-cat-occupation' : 'tag-cat-age')}"></span>
+                            </div>
+                             <div class="col-md-4 border-end">
+                                <h6 class="tag-group-title">资产规模</h6>
+                                 <span th:each="tag : ${assetTags}" class="badge tag-badge" th:text="${tag.tagName}" th:classappend="'tag-cat-asset'"></span>
+                            </div>
+                             <div class="col-md-4">
+                                <h6 class="tag-group-title">投资风格</h6>
+                                 <span th:each="tag : ${styleTags}" class="badge tag-badge" th:text="${tag.tagName}" th:classappend="'tag-cat-style'"></span>
+                            </div>
+                        </div>
+                        <hr class="my-3">
+                        <div class="row">
+                             <div class="col-md-6 border-end">
+                                <h6 class="tag-group-title">交易习惯</h6>
+                                 <span th:each="tag : ${tradingHabitTags}" class="badge tag-badge" th:text="${tag.tagName}" th:classappend="${tag.tagCategory == T(com.whu.hongjing.constants.TaggingConstants).CATEGORY_RECENCY ? 'tag-cat-recency' : 'tag-cat-frequency'}"></span>
+                            </div>
+                             <div class="col-md-6">
+                                <h6 class="tag-group-title">风险状况</h6>
+                                 <span th:each="tag : ${riskProfileTags}" class="badge tag-badge" th:text="${tag.tagName}" th:classappend="${tag.tagCategory == T(com.whu.hongjing.constants.TaggingConstants).CATEGORY_RISK_DECLARED ? 'tag-cat-risk-declared' : (tag.tagCategory == T(com.whu.hongjing.constants.TaggingConstants).CATEGORY_RISK_ACTUAL ? 'tag-cat-risk-actual' : (tag.tagName == T(com.whu.hongjing.constants.TaggingConstants).LABEL_DIAGNOSIS_MATCH ? 'tag-cat-risk-diagnosis-match' : (tag.tagName == T(com.whu.hongjing.constants.TaggingConstants).LABEL_DIAGNOSIS_OVERWEIGHT ? 'tag-cat-risk-diagnosis-overweight' : 'tag-cat-risk-diagnosis-underweight')))}"></span>
+                            </div>
+                        </div>
+                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-header">画像标签</div>
-            <div class="card-body">
-                <div th:if="${#lists.isEmpty(tags)}">
-                    <p class="text-muted">该客户暂无画像标签。</p>
+        <div class="row" th:if="${stats != null}">
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card metric-card metric-card-asset shadow h-100">
+                    <div class="card-body"><div class="row no-gutters align-items-center"><div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">当前总资产</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" th:text="${#numbers.formatDecimal(stats.totalMarketValue, 1, 'COMMA', 2, 'POINT')} + ' 元'"></div>
+                    </div><div class="col-auto"><i class="bi bi-wallet2 fs-2 text-gray-300"></i></div></div></div>
                 </div>
-                <div th:unless="${#lists.isEmpty(tags)}">
-                    <span th:each="tag : ${tags}" class="badge bg-warning text-dark me-2 mb-2 p-2"
-                          th:text="${tag.tagName}">
-                        标签名
-                    </span>
+            </div>
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card metric-card metric-card-neutral shadow h-100">
+                    <div class="card-body"><div class="row no-gutters align-items-center"><div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">累计总投资</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800" th:text="${#numbers.formatDecimal(stats.totalInvestment, 1, 'COMMA', 2, 'POINT')} + ' 元'"></div>
+                    </div><div class="col-auto"><i class="bi bi-piggy-bank-fill fs-2 text-gray-300"></i></div></div></div>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card metric-card shadow h-100" th:classappend="${stats.totalProfitLoss >= 0 ? 'metric-card-profit' : 'metric-card-loss'}">
+                    <div class="card-body"><div class="row no-gutters align-items-center"><div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1" th:classappend="${stats.totalProfitLoss >= 0 ? 'text-danger' : 'text-success'}">累计总盈亏</div>
+                        <div class="h5 mb-0 font-weight-bold" th:classappend="${stats.totalProfitLoss >= 0 ? 'text-profit' : 'text-loss'}" th:text="${(stats.totalProfitLoss >= 0 ? '+' : '') + #numbers.formatDecimal(stats.totalProfitLoss, 1, 'COMMA', 2, 'POINT')} + ' 元'"></div>
+                    </div><div class="col-auto"><i class="bi fs-2 text-gray-300" th:classappend="${stats.totalProfitLoss >= 0 ? 'bi-graph-up-arrow' : 'bi-graph-down-arrow'}"></i></div></div></div>
+                </div>
+            </div>
+            <div class="col-xl-3 col-md-6 mb-4">
+                <div class="card metric-card shadow h-100" th:classappend="${stats.profitLossRate >= 0 ? 'metric-card-profit' : 'metric-card-loss'}">
+                    <div class="card-body"><div class="row no-gutters align-items-center"><div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1" th:classappend="${stats.profitLossRate >= 0 ? 'text-danger' : 'text-success'}">总盈亏率</div>
+                        <div class="h5 mb-0 font-weight-bold" th:classappend="${stats.profitLossRate >= 0 ? 'text-profit' : 'text-loss'}" th:text="${(stats.profitLossRate >= 0 ? '+' : '') + #numbers.formatDecimal(stats.profitLossRate, 1, 2, 'POINT')} + '%'"></div>
+                    </div><div class="col-auto"><i class="bi bi-reception-4 fs-2 text-gray-300"></i></div></div></div>
                 </div>
             </div>
         </div>
 
+        <div class="row mt-4">
+            <div class="col-12"><div class="card"><div class="card-header fw-bold"><i class="bi bi-graph-up me-2"></i>投资分析图表</div>
+            <div class="card-body" style="min-height: 400px;"><p class="text-muted text-center pt-5">投资分析图表模块即将上线...</p></div>
+            </div></div>
+        </div>
     </div>
 </div>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header"><strong class="me-auto" id="toast-title"></strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button></div>
+        <div class="toast-body" id="toast-body"></div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script th:inline="javascript">
+document.addEventListener('DOMContentLoaded', function() {
+    const refreshBtn = document.getElementById('refresh-single-tag-btn');
+    const toastElement = document.getElementById('liveToast');
+
+    // 检查核心元素是否存在
+    if (!refreshBtn || !toastElement) {
+        console.error("错误：刷新按钮或Toast容器未在页面中找到！");
+        return;
+    }
+
+    const toast = new bootstrap.Toast(toastElement);
+    const toastTitle = document.getElementById('toast-title');
+    const toastBody = document.getElementById('toast-body');
+
+    refreshBtn.addEventListener('click', function() {
+        const customerId = this.dataset.customerId;
+        if (!confirm('确定要为客户ID: ' + customerId + ' 重新生成所有画像标签吗？')) {
+            return;
+        }
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 刷新中...';
+
+        toastTitle.textContent = '⏳ 刷新中...';
+        toastBody.textContent = '正在为客户 ' + customerId + ' 更新标签...';
+        toastElement.className = 'toast text-bg-info';
+        toast.show();
+
+        fetch('/api/tags/refresh/' + customerId, { method: 'POST' })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => { throw new Error(err.message || '服务器错误') });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    toastTitle.textContent = '✅ 刷新成功';
+                    toastBody.textContent = data.message + ' 页面即将自动刷新...';
+                    toastElement.className = 'toast text-bg-success';
+                    toast.show();
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    throw new Error(data.message);
+                }
+            })
+            .catch(error => {
+                toastTitle.textContent = '❌ 刷新失败';
+                toastBody.textContent = error.message;
+                toastElement.className = 'toast text-bg-danger';
+                toast.show();
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> 刷新标签';
+            });
+    });
+});
+</script>
 
 </body>
 </html>

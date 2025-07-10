@@ -116,7 +116,7 @@ public class PageController {
 
 
     /**
-     * 【修改】显示客户详情页面，增加标签排序功能
+     * 显示客户详情页面，加载基础信息、分组后的标签、盈亏统计，最终版Pro：支持高级分组与排序
      */
     @GetMapping("/customer/detail/{id}")
     public String showDetailView(
@@ -132,36 +132,60 @@ public class PageController {
         }
 
         // 1. 获取该客户的所有标签关系
-        QueryWrapper<CustomerTagRelation> tagQuery = new QueryWrapper<>();
-        tagQuery.eq("customer_id", id);
-        List<CustomerTagRelation> tags = customerTagRelationService.list(tagQuery);
-
-        // 2. 定义我们期望的“黄金排序规则”
-        List<String> categoryOrder = List.of(
-            TaggingConstants.CATEGORY_AGE,
-            TaggingConstants.CATEGORY_GENDER,
-            TaggingConstants.CATEGORY_OCCUPATION,
-            TaggingConstants.CATEGORY_STYLE,
-            TaggingConstants.CATEGORY_ASSET,
-            TaggingConstants.CATEGORY_RECENCY,
-            TaggingConstants.CATEGORY_FREQUENCY,
-            TaggingConstants.CATEGORY_RISK_DECLARED,
-            TaggingConstants.CATEGORY_RISK_ACTUAL,
-            TaggingConstants.CATEGORY_RISK_DIAGNOSIS
+        List<CustomerTagRelation> allTags = customerTagRelationService.list(
+                new QueryWrapper<CustomerTagRelation>().eq("customer_id", id)
         );
 
-        // 3. 根据我们的规则，对标签进行排序
-        tags.sort(Comparator.comparing(tag -> categoryOrder.indexOf(tag.getTagCategory())));
+        // 2. 【核心改造】按最终布局要求，准备5个独立的标签列表
+        // a. 基础画像 (年龄/性别/职业)
+        List<CustomerTagRelation> basicProfileTags = allTags.stream().filter(t ->
+                t.getTagCategory().equals(TaggingConstants.CATEGORY_AGE) ||
+                t.getTagCategory().equals(TaggingConstants.CATEGORY_GENDER) ||
+                t.getTagCategory().equals(TaggingConstants.CATEGORY_OCCUPATION)
+        ).collect(Collectors.toList());
 
+        // b. 资产规模
+        List<CustomerTagRelation> assetTags = allTags.stream().filter(t ->
+                t.getTagCategory().equals(TaggingConstants.CATEGORY_ASSET)
+        ).collect(Collectors.toList());
 
+        // c. 投资风格
+        List<CustomerTagRelation> styleTags = allTags.stream().filter(t ->
+                t.getTagCategory().equals(TaggingConstants.CATEGORY_STYLE)
+        ).collect(Collectors.toList());
+
+        // d. 交易习惯 (近期R + 历史F) -> 内部排序
+        List<String> tradingHabitOrder = List.of(TaggingConstants.CATEGORY_RECENCY, TaggingConstants.CATEGORY_FREQUENCY);
+        List<CustomerTagRelation> tradingHabitTags = allTags.stream().filter(t ->
+                tradingHabitOrder.contains(t.getTagCategory())
+        ).sorted(Comparator.comparing(t -> tradingHabitOrder.indexOf(t.getTagCategory())))
+         .collect(Collectors.toList());
+
+        // e. 风险状况 (申报 + 实盘 + 诊断) -> 内部排序
+        List<String> riskProfileOrder = List.of(TaggingConstants.CATEGORY_RISK_DECLARED, TaggingConstants.CATEGORY_RISK_ACTUAL, TaggingConstants.CATEGORY_RISK_DIAGNOSIS);
+        List<CustomerTagRelation> riskProfileTags = allTags.stream().filter(t ->
+                riskProfileOrder.contains(t.getTagCategory())
+        ).sorted(Comparator.comparing(t -> riskProfileOrder.indexOf(t.getTagCategory())))
+         .collect(Collectors.toList());
+
+        // 3. 获取客户的盈亏与资产统计数据 (逻辑不变)
+        ProfitLossVO profitLossVO = customerService.getProfitLossVO(id);
+
+        // 4. 将所有数据放入 Model
         model.addAttribute("customer", customer);
-        model.addAttribute("tags", tags); // <-- 此处的tags已经是排序后的了
+        model.addAttribute("stats", profitLossVO);
+        model.addAttribute("basicProfileTags", basicProfileTags);
+        model.addAttribute("assetTags", assetTags);
+        model.addAttribute("styleTags", styleTags);
+        model.addAttribute("tradingHabitTags", tradingHabitTags);
+        model.addAttribute("riskProfileTags", riskProfileTags);
+
         model.addAttribute("activeUri", "/customer/list");
-        // --- 【【【 动态构建返回链接 】】】 ---
         model.addAttribute("backUrl", buildBackUrl(name, idNumber, tagName, returnUrl));
 
         return "customer/detail";
     }
+
 
     /**
      * 【私有辅助方法】用于从其他链接跳转到客户列表查看详情时，可以顺利返回其他链接。用于构建带查询参数的返回URL。
@@ -287,7 +311,8 @@ public class PageController {
             @RequestParam(value = "size", defaultValue = "10") int pageSize,
             @RequestParam(required = false) String customerName,
             @RequestParam(required = false) String fundCode,
-            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false, defaultValue = "lastUpdateDate") String sortField,
+            // 持仓数据倒序显示最近更新过的
             @RequestParam(required = false, defaultValue = "desc") String sortOrder)
     {
         Page<CustomerHoldingVO> holdingPage = new Page<>(pageNum, pageSize);
@@ -334,7 +359,8 @@ public class PageController {
             @RequestParam(required = false) String customerName,
             @RequestParam(required = false) String fundCode,
             @RequestParam(required = false) String transactionType,
-            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false, defaultValue = "transactionTime") String sortField,
+            // 交易数据倒序显示最近发生的交易
             @RequestParam(required = false, defaultValue = "desc") String sortOrder)
     {
 
@@ -509,7 +535,7 @@ public class PageController {
                                  // 确保这里能接收 customerName
                                  @RequestParam(required = false) String customerName,
                                  @RequestParam(required = false, defaultValue = "customerId") String sortField,
-                                 @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
+                                 @RequestParam(required = false, defaultValue = "asc") String sortOrder) {
 
         Page<ProfitLossVO> page = new Page<>(pageNum, pageSize);
 
