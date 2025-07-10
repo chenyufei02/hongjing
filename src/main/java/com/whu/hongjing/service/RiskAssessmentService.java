@@ -25,7 +25,8 @@ public interface RiskAssessmentService extends IService<RiskAssessment> {
      * @param sortOrder 排序顺序 (asc, desc)
      * @return 包含风险评估视图对象(VO)的分页结果
      */
-   Page<RiskAssessmentVO> getAssessmentPage(
-           Page<RiskAssessmentVO> page, String customerName,
-           String riskLevel, String sortField, String sortOrder);
+    Page<RiskAssessmentVO> getAssessmentPage(
+            Page<RiskAssessmentVO> page, String customerName, String riskLevel,
+            String actualRiskLevel, String riskDiagnosis, // <-- 新增参数
+            String sortField, String sortOrder);
 }

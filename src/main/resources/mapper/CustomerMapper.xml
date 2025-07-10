@@ -40,7 +40,6 @@
     </select>
 
 
-<!--  多标签查询  -->
     <select id="findCustomerIdsByTags" resultType="long">
         SELECT customer_id
         FROM customer_tag_relation

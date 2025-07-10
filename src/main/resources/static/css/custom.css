@@ -73,3 +73,47 @@ body {
     color: inherit; /* 鼠标悬浮时也保持原色 */
     text-decoration: none;
 }
+
+/* 【【【 新增：盈亏管理的颜色样式 】】】 */
+.text-profit {
+    color: #d32f2f !important; /* 红色代表盈利 */
+}
+
+.text-loss {
+    color: #388e3c !important; /* 绿色代表亏损 */
+}
+
+
+/* 【【【 新增：风险诊断标签的专属颜色 】】】 */
+.badge-diagnosis-overweight {
+    color: #000;
+    background-color: #ffc107; /* 警告：黄色 (行为激进) */
+}
+
+.badge-diagnosis-match {
+    color: #fff;
+    background-color: #198754; /* 成功：绿色 (知行合一) */
+}
+
+.badge-diagnosis-conservative {
+    color: #fff;
+    background-color: #0d6efd; /* 主要：蓝色 (行为保守) */
+}
+
+
+
+/* --- 【【【 新增：针对盈亏管理页面的样式调整 】】】 --- */
+
+/* 1. 全局表格内容居中对齐 */
+.table th, .table td {
+    text-align: center;
+    vertical-align: middle; /* 保持垂直居中 */
+}
+
+/* 2. 针对盈亏管理页面的第一列，进行特殊处理 */
+.table-profit-loss th:first-child,
+.table-profit-loss td:first-child {
+    text-align: center !important; /* 设置文本居中对齐 */
+    padding-left: 1rem !important;  /* 适度增加左内边距 */
+    padding-right: 1rem !important; /* 适度增加右内边距，以平衡两侧空间 */
+}

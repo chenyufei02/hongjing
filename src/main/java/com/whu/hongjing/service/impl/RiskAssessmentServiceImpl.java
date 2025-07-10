@@ -3,22 +3,24 @@ package com.whu.hongjing.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.whu.hongjing.enums.RiskLevelEnum; // 1. 导入我们创建的枚举类
+import com.whu.hongjing.constants.TaggingConstants;
+import com.whu.hongjing.enums.RiskLevelEnum;
 import com.whu.hongjing.mapper.RiskAssessmentMapper;
 import com.whu.hongjing.pojo.dto.RiskAssessmentSubmitDTO;
 import com.whu.hongjing.pojo.entity.Customer;
+import com.whu.hongjing.pojo.entity.CustomerTagRelation;
 import com.whu.hongjing.pojo.entity.RiskAssessment;
+import com.whu.hongjing.pojo.vo.RiskAssessmentVO;
 import com.whu.hongjing.service.CustomerService;
+import com.whu.hongjing.service.CustomerTagRelationService;
 import com.whu.hongjing.service.RiskAssessmentService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.whu.hongjing.pojo.vo.RiskAssessmentVO;
 import org.springframework.util.StringUtils;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,6 +28,9 @@ public class RiskAssessmentServiceImpl extends ServiceImpl<RiskAssessmentMapper,
 
     @Autowired
     private CustomerService customerService;
+
+    @Autowired
+    private CustomerTagRelationService customerTagRelationService;
 
     @Override
     public RiskAssessment createAssessment(RiskAssessmentSubmitDTO dto) {
@@ -47,40 +52,69 @@ public class RiskAssessmentServiceImpl extends ServiceImpl<RiskAssessmentMapper,
         return assessment;
     }
 
+    /**
+     * 【最终完整版】同时支持多维度复杂查询与动态排序
+     */
     @Override
     @Transactional(readOnly = true)
     public Page<RiskAssessmentVO> getAssessmentPage(
-            Page<RiskAssessmentVO> page, String customerName,
-            String riskLevel, String sortField, String sortOrder)
+            Page<RiskAssessmentVO> page, String customerName, String riskLevel,
+            String actualRiskLevel, String riskDiagnosis,
+            String sortField, String sortOrder)
     {
-        // 步骤 1: 根据客户姓名查询匹配的客户ID
-        List<Long> customerIds = null;
-        if (StringUtils.hasText(customerName)) {
-            customerIds = customerService.lambdaQuery()
-                    .like(Customer::getName, customerName)
-                    .list().stream()
-                    .map(Customer::getId)
-                    .collect(Collectors.toList());
-            if (customerIds.isEmpty()) {
-                return page.setRecords(Collections.emptyList());
+        // 步骤 1: 基于所有筛选条件（客户姓名、实盘风险、风险诊断），预先筛选出符合条件的客户ID集合。
+        Set<Long> customerIdsToFilter = null;
+
+        // a. 如果有按“实盘风险”或“风险诊断”这两个标签的筛选条件
+        if (StringUtils.hasText(actualRiskLevel) || StringUtils.hasText(riskDiagnosis)) {
+            customerIdsToFilter = customerTagRelationService.findCustomerIdsByTags(
+                    Map.of(
+                        TaggingConstants.CATEGORY_RISK_ACTUAL, actualRiskLevel,
+                        TaggingConstants.CATEGORY_RISK_DIAGNOSIS, riskDiagnosis
+                    )
+            );
+            if (customerIdsToFilter.isEmpty()) {
+                page.setRecords(Collections.emptyList());
+                page.setTotal(0);
+                return page;
             }
         }
 
-        // 步骤 2: 构建对风险评估表的分页查询
-        QueryWrapper<RiskAssessment> assessmentQueryWrapper = new QueryWrapper<>();
-        if (customerIds != null) {
-            assessmentQueryWrapper.in("customer_id", customerIds);
+        // b. 如果有按客户姓名的筛选条件
+        if (StringUtils.hasText(customerName)) {
+            Set<Long> idsByName = customerService.lambdaQuery()
+                    .like(Customer::getName, customerName)
+                    .list().stream().map(Customer::getId).collect(Collectors.toSet());
+
+            if (customerIdsToFilter == null) {
+                customerIdsToFilter = idsByName;
+            } else {
+                customerIdsToFilter.retainAll(idsByName); // 取交集
+            }
+
+            if (customerIdsToFilter.isEmpty()) {
+                page.setRecords(Collections.emptyList());
+                page.setTotal(0);
+                return page;
+            }
         }
+
+        // 步骤 2: 构建对 risk_assessment 表的主查询
+        QueryWrapper<RiskAssessment> assessmentQueryWrapper = new QueryWrapper<>();
+
+        // a. 应用上面预筛选出的客户ID集合作为查询条件
+        if (customerIdsToFilter != null) {
+            assessmentQueryWrapper.in("customer_id", customerIdsToFilter);
+        }
+
+        // b. 应用对“申报风险”的筛选（这是表内字段）
         if (StringUtils.hasText(riskLevel)) {
             assessmentQueryWrapper.eq("risk_level", riskLevel);
         }
 
-        //  排序逻辑
-        if (StringUtils.hasText(sortField) && StringUtils.hasText(sortOrder)) {
-            // 将前端传来的驼峰式字段名转换为数据库的下划线式列名
-            // Mybatis-Plus的QueryWrapper可以直接使用实体类的属性名，它会自动映射
+        // c. 【【【 关键修复：恢复动态排序逻辑 】】】
+        if (StringUtils.hasText(sortField)) {
             String dbColumn;
-            // 【关键】手动将前端传来的驼峰字段名，转换为数据库的下划线列名
             switch (sortField) {
                 case "customerId":
                     dbColumn = "customer_id";
@@ -92,21 +126,19 @@ public class RiskAssessmentServiceImpl extends ServiceImpl<RiskAssessmentMapper,
                     dbColumn = "assessment_date";
                     break;
                 default:
-                    // 如果传入了未知的排序字段，则使用默认排序，防止SQL注入
-                    dbColumn = "customer_id";
-                    sortOrder = "asc";
+                    dbColumn = "assessment_date";
+                    sortOrder = "desc";
             }
-
             if ("asc".equalsIgnoreCase(sortOrder)) {
                 assessmentQueryWrapper.orderByAsc(dbColumn);
             } else {
                 assessmentQueryWrapper.orderByDesc(dbColumn);
             }
         } else {
-            // 默认排序
-            assessmentQueryWrapper.orderByAsc("customer_id");
+            assessmentQueryWrapper.orderByDesc("assessment_date"); // 默认按评估日期降序
         }
 
+        // 步骤 3: 执行分页查询，此时查询结果是已经排序好的
         Page<RiskAssessment> assessmentPage = new Page<>(page.getCurrent(), page.getSize());
         this.page(assessmentPage, assessmentQueryWrapper);
 
@@ -115,24 +147,40 @@ public class RiskAssessmentServiceImpl extends ServiceImpl<RiskAssessmentMapper,
             return page.setRecords(Collections.emptyList());
         }
 
-        // 步骤 3: 批量获取关联的客户信息
-        List<Long> resultCustomerIds = assessmentRecords.stream().map(RiskAssessment::getCustomerId).distinct().collect(Collectors.toList());
+        // 步骤 4: 批量获取关联数据（客户姓名和标签），用于填充VO
+        List<Long> resultCustomerIds = assessmentRecords.stream()
+                .map(RiskAssessment::getCustomerId).distinct().collect(Collectors.toList());
+
         Map<Long, String> customerIdToNameMap = customerService.listByIds(resultCustomerIds).stream()
                 .collect(Collectors.toMap(Customer::getId, Customer::getName));
 
-        // 步骤 4: 组装最终的 RiskAssessmentVO 列表
+        List<String> targetCategories = List.of(TaggingConstants.CATEGORY_RISK_ACTUAL, TaggingConstants.CATEGORY_RISK_DIAGNOSIS);
+        List<CustomerTagRelation> relatedTags = customerTagRelationService.lambdaQuery()
+                .in(CustomerTagRelation::getCustomerId, resultCustomerIds)
+                .in(CustomerTagRelation::getTagCategory, targetCategories)
+                .list();
+        Map<Long, Map<String, String>> customerTagsMap = relatedTags.stream()
+                .collect(Collectors.groupingBy(
+                        CustomerTagRelation::getCustomerId,
+                        Collectors.toMap(CustomerTagRelation::getTagCategory, CustomerTagRelation::getTagName, (t1, t2) -> t1)
+                ));
+
+        // 步骤 5: 组装最终的VO列表
         List<RiskAssessmentVO> voRecords = assessmentRecords.stream().map(assessment -> {
             RiskAssessmentVO vo = new RiskAssessmentVO();
             BeanUtils.copyProperties(assessment, vo);
             vo.setCustomerName(customerIdToNameMap.get(assessment.getCustomerId()));
+            Map<String, String> tagsForCustomer = customerTagsMap.get(assessment.getCustomerId());
+            if (tagsForCustomer != null) {
+                vo.setActualRiskLevel(tagsForCustomer.get(TaggingConstants.CATEGORY_RISK_ACTUAL));
+                vo.setRiskDiagnosis(tagsForCustomer.get(TaggingConstants.CATEGORY_RISK_DIAGNOSIS));
+            }
             return vo;
         }).collect(Collectors.toList());
 
-        // 步骤 5: 设置分页结果并返回
+        // 设置并返回最终的分页结果
         page.setRecords(voRecords);
         page.setTotal(assessmentPage.getTotal());
         return page;
     }
-
-
 }

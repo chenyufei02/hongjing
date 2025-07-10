@@ -54,7 +54,6 @@
                 <table class="table table-hover">
                     <thead>
                     <tr>
-                        <th>操作</th>
                         <th>
                             <a class="table-sort-link" th:href="@{/holding/list(page=${holdingPage.current}, size=${holdingPage.size}, customerName=${customerName}, fundCode=${fundCode}, sortField='customerId', sortOrder=${sortField == 'customerId' ? reversedSortOrder : 'asc'})}">
                                 客户姓名 (ID)
@@ -70,16 +69,13 @@
                                 <span th:if="${sortField == 'marketValue'}" th:text="${sortOrder == 'asc' ? '▲' : '▼'}"></span>
                             </a>
                         </th>
-                        <th>最后更新时间</th>
+                        <th class="text-nowrap">最后更新时间</th>
+                        <th class="text-nowrap">操作</th>
                     </tr>
                     </thead>
 
                     <tbody>
                         <tr th:if="${not #lists.isEmpty(holdingPage.records)}" th:each="holding : ${holdingPage.records}">
-                            <td>
-                                <a class="btn btn-sm btn-outline-primary" th:href="
-                                @{/customer/detail/{id}(id=${holding.customerId})}">查看详情</a>
-                            </td>
                             <td>
                                 <div th:text="${holding.customerName}">客户名称</div>
                                 <small class="text-muted" th:text="'ID: ' + ${holding.customerId}"></small>
@@ -92,10 +88,13 @@
                             <td th:text="${#numbers.formatDecimal(holding.averageCost, 1, 4)}"></td>
                             <td th:text="${holding.marketValue != null ? #numbers.formatDecimal(holding.marketValue, 1, 2) : 'N/A'}"
                                 th:classappend="${holding.marketValue != null and holding.marketValue < (holding.averageCost * holding.totalShares) ? 'text-success' : 'text-danger'}"></td>
-                            <td th:text="${#temporals.format(holding.lastUpdateDate, 'yyyy-MM-dd HH:mm')}"></td>
+                            <td class="text-nowrap" th:text="${#temporals.format(holding.lastUpdateDate, 'yyyy-MM-dd HH:mm')}"></td>
+                            <td class="text-nowrap">
+                                <a class="btn btn-sm btn-outline-primary" th:href="@{/customer/detail/{id}(id=${holding.customerId}, returnUrl=${#request.getRequestURI() + '?' + #request.getQueryString()})}">查看详情</a>
+                            </td>
                         </tr>
                         <tr th:if="${#lists.isEmpty(holdingPage.records)}">
-                            <td colspan="6" class="text-center p-4">没有找到符合条件的持仓数据。</td>
+                            <td colspan="7" class="text-center p-4">没有找到符合条件的持仓数据。</td>
                         </tr>
                     </tbody>
                 </table>

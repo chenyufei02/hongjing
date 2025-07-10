@@ -30,6 +30,9 @@ import java.util.Arrays;
 import com.whu.hongjing.pojo.vo.TagVO;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 
 /**
  * 专门负责返回页面视图的控制器
@@ -50,6 +53,9 @@ public class PageController {
     private FundTransactionService fundTransactionService;
     @Autowired
     private RiskAssessmentService riskAssessmentService;
+    // 注入 Spring Boot 默认配置好的 ObjectMapper
+    @Autowired
+    private ObjectMapper objectMapper;
 
     /**
      * 显示主页（工作台）
@@ -117,7 +123,8 @@ public class PageController {
             @PathVariable Long id, Model model,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String idNumber,
-            @RequestParam(required = false) String tagName)
+            @RequestParam(required = false) String tagName,
+            @RequestParam(required = false) String returnUrl)
     {
         Customer customer = customerService.getCustomerById(id);
         if (customer == null) {
@@ -150,9 +157,34 @@ public class PageController {
         model.addAttribute("customer", customer);
         model.addAttribute("tags", tags); // <-- 此处的tags已经是排序后的了
         model.addAttribute("activeUri", "/customer/list");
-        model.addAttribute("backUrl", buildBackUrl(name, idNumber, tagName));
+        // --- 【【【 动态构建返回链接 】】】 ---
+        model.addAttribute("backUrl", buildBackUrl(name, idNumber, tagName, returnUrl));
 
         return "customer/detail";
+    }
+
+    /**
+     * 【私有辅助方法】用于从其他链接跳转到客户列表查看详情时，可以顺利返回其他链接。用于构建带查询参数的返回URL。
+     */
+    private String buildBackUrl(String name, String idNumber, String tagName, String returnUrl) {
+        // 1. 优先判断是否有从其他页面（如持仓、交易页）传来的完整返回地址
+        if (StringUtils.hasText(returnUrl)) {
+            // 如果有，直接使用，这是最高优先级
+            return returnUrl;
+        }
+
+        // 2. 如果没有returnUrl，则说明是从客户管理页来的，我们构建返回到客户管理页的链接
+        StringBuilder url = new StringBuilder("/customer/list?from=details"); // from参数只是为了让URL不为空
+        if (StringUtils.hasText(name)) {
+            url.append("&name=").append(name);
+        }
+        if (StringUtils.hasText(idNumber)) {
+            url.append("&idNumber=").append(idNumber);
+        }
+        if (StringUtils.hasText(tagName)) {
+            url.append("&tagName=").append(tagName);
+        }
+        return url.toString();
     }
 
 
@@ -340,7 +372,7 @@ public class PageController {
 
 
     /**
-     * 【新增】显示风险评估列表页面
+     * 【最终形态】显示风险评估列表页面，支持多维度查询
      */
     @GetMapping("/risk/list")
     public String riskList(
@@ -349,13 +381,16 @@ public class PageController {
             @RequestParam(value = "size", defaultValue = "10") int pageSize,
             @RequestParam(required = false) String customerName,
             @RequestParam(required = false) String riskLevel,
-            @RequestParam(required = false) String sortField,
+            // --- 【【【 新增的请求参数 】】】 ---
+            @RequestParam(required = false) String actualRiskLevel,
+            @RequestParam(required = false) String riskDiagnosis,
+            @RequestParam(required = false, defaultValue = "customerId") String sortField,
             @RequestParam(required = false, defaultValue = "asc") String sortOrder)
     {
-
         Page<RiskAssessmentVO> assessmentPage = new Page<>(pageNum, pageSize);
         // 同时传递排序参数
-        riskAssessmentService.getAssessmentPage(assessmentPage, customerName, riskLevel, sortField, sortOrder);
+        riskAssessmentService.getAssessmentPage(assessmentPage, customerName, riskLevel,
+                actualRiskLevel, riskDiagnosis, sortField, sortOrder);
 
         // 分页导航栏的计算逻辑
         int startPage = 1, endPage = (int) assessmentPage.getPages();
@@ -367,22 +402,32 @@ public class PageController {
             }
         }
 
-        // 从枚举中获取所有风险等级，用于查询下拉框
+        // --- 【【【 新增的数据准备 】】】 ---
+        // a. 准备“风险诊断”下拉框的选项列表
+        List<String> riskDiagnoses = List.of(
+            TaggingConstants.LABEL_DIAGNOSIS_OVERWEIGHT,
+            TaggingConstants.LABEL_DIAGNOSIS_MATCH,
+            TaggingConstants.LABEL_DIAGNOSIS_UNDERWEIGHT
+        );
+        model.addAttribute("riskDiagnoses", riskDiagnoses);
+
+        // b. 准备“申报/实盘风险”下拉框的选项列表 (逻辑不变)
         List<String> riskLevels = Arrays.stream(RiskLevelEnum.values())
                 .map(RiskLevelEnum::getLevelName)
                 .collect(Collectors.toList());
+        model.addAttribute("riskLevels", riskLevels);
 
+        // --- 将所有查询参数传回给前端，用于表单回显 ---
         model.addAttribute("assessmentPage", assessmentPage);
         model.addAttribute("startPage", startPage);
         model.addAttribute("endPage", endPage);
-        model.addAttribute("riskLevels", riskLevels); // 将风险等级列表放入model
         model.addAttribute("activeUri", "/risk/list");
-        // 将查询参数传回给前端，用于表单回显和分页
         model.addAttribute("customerName", customerName);
         model.addAttribute("riskLevel", riskLevel);
+        model.addAttribute("actualRiskLevel", actualRiskLevel); // <-- 新增
+        model.addAttribute("riskDiagnosis", riskDiagnosis);   // <-- 新增
         model.addAttribute("sortField", sortField);
         model.addAttribute("sortOrder", sortOrder);
-        // 【关键】传递一个反转后的排序顺序，方便前端生成链接
         model.addAttribute("reversedSortOrder", "asc".equals(sortOrder) ? "desc" : "asc");
 
         return "risk/list";
@@ -393,13 +438,12 @@ public class PageController {
      * 【升级版】显示标签管理页面, 按类别分组展示
      */
     @GetMapping("/tag/list")
-    public String tagList(Model model,
-                          @RequestParam(required = false) String category)
+    public String tagList(Model model)
     {
         // 1. 调用服务，获取所有标签的统计数据
         List<TagVO> allTags = customerTagRelationService.getTagStats();
 
-        // 2. 定义我们期望的“黄金排序规则”
+        // 2. 定义我们期望的“黄金排序规则”，确保页面下拉框顺序稳定
         List<String> categoryOrder = List.of(
             TaggingConstants.CATEGORY_AGE,
             TaggingConstants.CATEGORY_GENDER,
@@ -413,23 +457,30 @@ public class PageController {
             TaggingConstants.CATEGORY_RISK_DIAGNOSIS
         );
 
-       // 3. 【核心改造】如果URL中传入了category参数，就只保留该类别，否则保留全部
-        final List<String> finalCategoryOrder = StringUtils.hasText(category) ? List.of(category) : categoryOrder;
-
-        // 4. 将标签列表按类别分组，并保持我们期望的顺序
-        Map<String, List<TagVO>> groupedTags = finalCategoryOrder.stream()
+        // 3. 将标签列表按预定义的类别顺序分组
+        Map<String, List<TagVO>> groupedTags = categoryOrder.stream()
             .collect(Collectors.toMap(
                 cat -> cat,
                 cat -> allTags.stream()
                                    .filter(tag -> cat.equals(tag.getTagCategory()))
                                    .collect(Collectors.toList()),
                 (e1, e2) -> e1,
-                LinkedHashMap::new
+                LinkedHashMap::new // 使用LinkedHashMap来保持插入顺序
             ));
 
+        // --- 【【【 新增的核心改造逻辑 】】】 ---
+        // a. 将 groupedTags 对象手动序列化为JSON字符串
+        String groupedTagsJson = "{}"; // 提供一个安全的默认值
+        try {
+            groupedTagsJson = objectMapper.writeValueAsString(groupedTags);
+        } catch (JsonProcessingException e) {
+            // 在生产环境中，这里应该使用日志框架记录错误
+            e.printStackTrace();
+        }
+
+        // b. 将原始Map对象（供下方th:each使用）和新的JSON字符串（供JS使用）都放入Model
         model.addAttribute("groupedTags", groupedTags);
-        model.addAttribute("allCategories", categoryOrder); // <-- 将所有类别列表传给前端，用于生成下拉框
-        model.addAttribute("selectedCategory", category);  // <--  将当前选中的类别传回，用于下拉框回显
+        model.addAttribute("groupedTagsJson", groupedTagsJson); // <-- 新增
         model.addAttribute("activeUri", "/tag/list");
 
         return "tag/list";
@@ -447,6 +498,7 @@ public class PageController {
         return "visualization/dashboard";
     }
 
+
     /**
      * 【最终性能版】显示客户盈亏排行榜页面（支持分页、搜索、多字段排序）
      */
@@ -454,24 +506,22 @@ public class PageController {
     public String profitLossList(Model model,
                                  @RequestParam(value = "page", defaultValue = "1") int pageNum,
                                  @RequestParam(value = "size", defaultValue = "10") int pageSize,
+                                 // 确保这里能接收 customerName
                                  @RequestParam(required = false) String customerName,
-                                 @RequestParam(required = false) String sortField,
+                                 @RequestParam(required = false, defaultValue = "customerId") String sortField,
                                  @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
 
         Page<ProfitLossVO> page = new Page<>(pageNum, pageSize);
 
-        // 【【【 关键安全升级 】】】
-        // 创建一个允许的排序列名白名单
         List<String> allowedSortFields = List.of("customerId", "totalMarketValue", "totalProfitLoss", "profitLossRate");
         String dbSortField = null;
-        if (sortField != null && allowedSortFields.contains(sortField)) {
+        if (allowedSortFields.contains(sortField)) {
             dbSortField = sortField;
         }
 
-        // 调用我们全新的、基于数据库计算的、高性能的服务方法
+        // 确保 customerName 被传递到服务层
         customerService.getProfitLossPage(page, customerName, dbSortField, sortOrder);
 
-        // ... (分页导航栏计算逻辑等，保持完全不变) ...
         int startPage = 1, endPage = (int) page.getPages();
         if (page.getPages() > 5) {
             startPage = Math.max(1, (int)page.getCurrent() - 2);
@@ -485,6 +535,7 @@ public class PageController {
         model.addAttribute("startPage", startPage);
         model.addAttribute("endPage", endPage);
         model.addAttribute("activeUri", "/profitloss/list");
+        // 确保 customerName 被传回前端，用于搜索框回显
         model.addAttribute("customerName", customerName);
         model.addAttribute("sortField", sortField);
         model.addAttribute("sortOrder", sortOrder);
@@ -494,10 +545,8 @@ public class PageController {
     }
 
 
-
-
     /**
-     * 一个私有辅助方法，用于构建带查询参数的返回URL
+     * 【私有辅助方法】 用于在本身的链接里面查看详情了以后能够顺利带着查询后的参数和结果返回本身的链接
      */
     private String buildBackUrl(String name, String idNumber, String tagName) {
         StringBuilder url = new StringBuilder("/customer/list?from=details"); // from参数只是为了让URL不为空

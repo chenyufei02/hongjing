@@ -16,8 +16,14 @@ public class RiskAssessmentVO {
     @Schema(description = "风险得分")
     private Integer riskScore;
 
-    @Schema(description = "风险等级")
+    @Schema(description = "申报风险")
     private String riskLevel;
+
+    @Schema(description = "实盘风险")
+    private String actualRiskLevel;
+
+    @Schema(description = "诊断结果")
+    private String riskDiagnosis;
 
     @Schema(description = "评估日期")
     private LocalDate assessmentDate;

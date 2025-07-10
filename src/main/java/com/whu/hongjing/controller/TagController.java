@@ -38,7 +38,7 @@ public class TagController {
             // 直接调用我们的异步批量服务
             tagRefreshService.refreshAllTagsAtomically();
             // 立即返回成功响应，告知前端任务已启动
-            return new ApiResponseVO(true, "全量客户标签刷新任务已成功启动，将在后台运行。");
+            return new ApiResponseVO(true, "全量标签刷新任务已成功执行完毕！");
         } catch (Exception e) {
             e.printStackTrace();
             return new ApiResponseVO(false, "启动全量刷新任务失败: " + e.getMessage());

@@ -57,7 +57,6 @@
                 <table class="table table-hover">
                     <thead>
                     <tr>
-                        <th>操作</th>
                         <th>
                             <a class="table-sort-link" th:href="@{/transaction/list(page=${transactionPage.current}, size=${transactionPage.size}, customerName=${customerName}, fundCode=${fundCode}, transactionType=${transactionType}, sortField='customerId', sortOrder=${sortField == 'customerId' ? reversedSortOrder : 'asc'})}">
                                 客户姓名 (ID)
@@ -76,13 +75,11 @@
                         <th>成交净值</th>
                         <th>交易时间</th>
                         <th>状态</th>
+                        <th>操作</th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr th:if="${not #lists.isEmpty(transactionPage.records)}" th:each="transaction : ${transactionPage.records}">
-                        <td><a class="btn btn-sm btn-outline-primary" th:href=
-                                "@{/customer/detail/{id}(id=${transaction.customerId})}">查看详情</a>
-                        </td>
                         <td>
                             <div th:text="${transaction.customerName}"></div>
                             <small class="text-muted" th:text="'ID: ' + ${transaction.customerId}"></small>
@@ -99,9 +96,11 @@
                         <td th:text="${#numbers.formatDecimal(transaction.sharePrice, 1, 4)}"></td>
                         <td th:text="${#temporals.format(transaction.transactionTime, 'yyyy-MM-dd HH:mm')}"></td>
                         <td th:text="${transaction.status}"></td>
+                        <td><a class="btn btn-sm btn-outline-primary" th:href="@{/customer/detail/{id}(id=${transaction.customerId}, returnUrl=${#request.getRequestURI() + '?' + #request.getQueryString()})}">查看详情</a>
+                        </td>
                     </tr>
                     <tr th:if="${#lists.isEmpty(transactionPage.records)}">
-                        <td colspan="8" class="text-center p-4">没有找到符合条件的交易数据。</td>
+                        <td colspan="9" class="text-center p-4">没有找到符合条件的交易数据。</td>
                     </tr>
                     </tbody>
                 </table>

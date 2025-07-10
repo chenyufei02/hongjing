@@ -25,23 +25,44 @@
 
         <div class="card mb-4">
             <div class="card-body">
-                <form class="row g-3 align-items-center" th:action="@{/risk/list}" method="get">
-                    <div class="col-md-4">
-                        <label for="customerName" class="visually-hidden">客户姓名</label>
-                        <input type="text" class="form-control" id="customerName" name="customerName" placeholder="按客户姓名模糊查询..." th:value="${customerName}">
-                    </div>
-                    <div class="col-md-4">
-                        <label for="riskLevel" class="visually-hidden">风险等级</label>
-                        <select class="form-select" id="riskLevel" name="riskLevel">
-                            <option value="">按风险等级查询...</option>
-                            <option th:each="level : ${riskLevels}" th:value="${level}" th:text="${level}" th:selected="${level == riskLevel}"></option>
-                        </select>
-                    </div>
-                    <div class="col-auto">
-                        <button type="submit" class="btn btn-primary">查询</button>
-                    </div>
-                    <div class="col-auto">
-                        <a th:href="@{/risk/list}" class="btn btn-outline-secondary">重置</a>
+                <form th:action="@{/risk/list}" method="get" class="mb-4">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-2">
+                            <label>
+                                <input type="text" name="customerName" class="form-control" placeholder="客户姓名" th:value="${customerName}">
+                            </label>
+                        </div>
+                        <div class="col-md-2">
+                            <label>
+                                <select name="riskLevel" class="form-select">
+                                    <option value="">选择申报风险...</option>
+                                    <option th:each="level : ${riskLevels}" th:value="${level}" th:text="${level}" th:selected="${level == riskLevel}"></option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <div class="col-md-2">
+                            <label>
+                                <select name="actualRiskLevel" class="form-select">
+                                    <option value="">选择实盘风险...</option>
+                                    <option th:each="level : ${riskLevels}" th:value="${level}" th:text="${level}" th:selected="${level == actualRiskLevel}"></option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <div class="col-md-2">
+                            <label>
+                                <select name="riskDiagnosis" class="form-select">
+                                    <option value="">选择风险诊断...</option>
+                                    <option th:each="diagnosis : ${riskDiagnoses}" th:value="${diagnosis}" th:text="${diagnosis}" th:selected="${diagnosis == riskDiagnosis}"></option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <div class="col-md-4 d-flex justify-content-start">
+                            <button type="submit" class="btn btn-primary me-2">查询</button>
+                            <a th:href="@{/risk/list}" class="btn btn-outline-secondary">重置</a>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -52,57 +73,81 @@
                 <table class="table table-hover">
                     <thead>
                     <tr>
-                        <th>操作</th>
                         <th>
-                            <a class="table-sort-link" th:href="@{/risk/list(page=${assessmentPage.current}, size=${assessmentPage.size}, customerName=${customerName}, riskLevel=${riskLevel}, sortField='customerId', sortOrder=${sortField == 'customerId' ? reversedSortOrder : 'asc'})}">
+                            <a class="table-sort-link" th:href="@{/risk/list(page=${assessmentPage.current}, size=${assessmentPage.size}, customerName=${customerName}, riskLevel=${riskLevel}, actualRiskLevel=${actualRiskLevel}, riskDiagnosis=${riskDiagnosis}, sortField='customerId', sortOrder=${sortField == 'customerId' ? reversedSortOrder : 'asc'})}">
                                 客户姓名 (ID)
                                 <span th:if="${sortField == 'customerId'}" th:text="${sortOrder == 'asc' ? '▲' : '▼'}"></span>
                             </a>
                         </th>
                         <th>
-                             <a class="table-sort-link" th:href="@{/risk/list(page=${assessmentPage.current}, size=${assessmentPage.size}, customerName=${customerName}, riskLevel=${riskLevel}, sortField='riskScore', sortOrder=${sortField == 'riskScore' ? reversedSortOrder : 'asc'})}">
+                             <a class="table-sort-link" th:href="@{/risk/list(page=${assessmentPage.current}, size=${assessmentPage.size}, customerName=${customerName}, riskLevel=${riskLevel}, actualRiskLevel=${actualRiskLevel}, riskDiagnosis=${riskDiagnosis}, sortField='riskScore', sortOrder=${sortField == 'riskScore' ? reversedSortOrder : 'asc'})}">
                                 风险得分
                                 <span th:if="${sortField == 'riskScore'}" th:text="${sortOrder == 'asc' ? '▲' : '▼'}"></span>
                             </a>
                         </th>
-                        <th>风险等级</th>
+                        <th>申报风险</th>
+                        <th>实盘风险</th>
+                        <th>风险诊断</th>
                         <th>
-                            <a class="table-sort-link" th:href="@{/risk/list(page=${assessmentPage.current}, size=${assessmentPage.size}, customerName=${customerName}, riskLevel=${riskLevel}, sortField='assessmentDate', sortOrder=${sortField == 'assessmentDate' ? reversedSortOrder : 'asc'})}">
+                            <a class="table-sort-link" th:href="@{/risk/list(page=${assessmentPage.current}, size=${assessmentPage.size}, customerName=${customerName}, riskLevel=${riskLevel}, actualRiskLevel=${actualRiskLevel}, riskDiagnosis=${riskDiagnosis}, sortField='assessmentDate', sortOrder=${sortField == 'assessmentDate' ? reversedSortOrder : 'asc'})}">
                                 评估日期
                                 <span th:if="${sortField == 'assessmentDate'}" th:text="${sortOrder == 'asc' ? '▲' : '▼'}"></span>
                             </a>
                         </th>
                         <th>记录创建时间</th>
+                        <th>操作</th>
                     </tr>
                     </thead>
 
                     <tbody>
                     <tr th:if="${not #lists.isEmpty(assessmentPage.records)}" th:each="assessment : ${assessmentPage.records}">
                         <td>
-                            <a class="btn btn-sm btn-outline-primary" th:href="
-                            @{/customer/detail/{id}(id=${assessment.customerId})}">查看详情</a>
-                        </td>
-                        <td>
                             <div th:text="${assessment.customerName}"></div>
                             <small class="text-muted" th:text="'ID: ' + ${assessment.customerId}"></small>
                         </td>
                         <td th:text="${assessment.riskScore}"></td>
-                        <!--       注意！这里当更改了风险评估的字符串以后需要手动重新设置颜色对应的字段！         -->
                         <td>
-                            <span th:switch="${assessment.riskLevel}">
-                                <span th:case="'申报-保守型'" class="badge bg-secondary" th:text="${assessment.riskLevel}"></span>
-                                <span th:case="'申报-稳健型'" class="badge bg-success" th:text="${assessment.riskLevel}"></span>
-                                <span th:case="'申报-平衡型'" class="badge bg-warning text-dark" th:text="${assessment.riskLevel}"></span>
-                                <span th:case="'申报-成长型'" class="badge badge-growth-orange" th:text="${assessment.riskLevel}"></span>
-                                <span th:case="'申报-激进型'" class="badge bg-danger" th:text="${assessment.riskLevel}"></span>
-                                <span th:case="*" class="badge bg-secondary" th:text="${assessment.riskLevel}"></span>
+                            <span th:switch="${assessment.riskLevel}" class="badge"
+                                  th:classappend="${#strings.contains(assessment.riskLevel, '保守型')} ? 'bg-secondary' :
+                                                 (${#strings.contains(assessment.riskLevel, '稳健型')} ? 'bg-success' :
+                                                 (${#strings.contains(assessment.riskLevel, '平衡型')} ? 'bg-warning text-dark' :
+                                                 (${#strings.contains(assessment.riskLevel, '成长型')} ? 'badge-growth-orange' :
+                                                 (${#strings.contains(assessment.riskLevel, '激进型')} ? 'bg-danger' : 'bg-secondary'))))"
+                                  th:text="${assessment.riskLevel}"></span>
+                        </td>
+                        <td>
+                            <span th:if="${assessment.actualRiskLevel == null}">N/A</span>
+                            <span th:if="${assessment.actualRiskLevel != null}"
+                                  th:switch="${assessment.actualRiskLevel}" class="badge"
+                                  th:classappend="${#strings.contains(assessment.actualRiskLevel, '保守型')} ? 'bg-secondary' :
+                                                 (${#strings.contains(assessment.actualRiskLevel, '稳健型')} ? 'bg-success' :
+                                                 (${#strings.contains(assessment.actualRiskLevel, '平衡型')} ? 'bg-warning text-dark' :
+                                                 (${#strings.contains(assessment.actualRiskLevel, '成长型')} ? 'badge-growth-orange' :
+                                                 (${#strings.contains(assessment.actualRiskLevel, '激进型')} ? 'bg-danger' : 'bg-secondary'))))"
+                                  th:text="${assessment.actualRiskLevel}">
+                            </span>
+                        </td>
+                        <td>
+                            <span th:if="${assessment.riskDiagnosis == null}">N/A</span>
+                            <span th:if="${assessment.riskDiagnosis != null}"
+                                  th:switch="${assessment.riskDiagnosis}" class="badge"
+                                  th:classappend="${assessment.riskDiagnosis == T(com.whu.hongjing.constants.TaggingConstants).LABEL_DIAGNOSIS_OVERWEIGHT} ? 'badge-diagnosis-overweight' :
+                                                 (${assessment.riskDiagnosis == T(com.whu.hongjing.constants.TaggingConstants).LABEL_DIAGNOSIS_MATCH} ? 'badge-diagnosis-match' :
+                                                 (${assessment.riskDiagnosis == T(com.whu.hongjing.constants.TaggingConstants).LABEL_DIAGNOSIS_UNDERWEIGHT} ? 'badge-diagnosis-conservative' : 'bg-secondary'))"
+                                  th:text="${assessment.riskDiagnosis}">
                             </span>
                         </td>
                         <td th:text="${#temporals.format(assessment.assessmentDate, 'yyyy-MM-dd')}"></td>
                         <td th:text="${#temporals.format(assessment.createTime, 'yyyy-MM-dd HH:mm')}"></td>
+                        <td>
+                            <a class="btn btn-sm btn-outline-primary"
+                               th:href="@{/customer/detail/{id}(id=${assessment.customerId},
+                               returnUrl=${#request.getRequestURI() + '?' +
+                               #request.getQueryString()})}">查看详情</a>
+                        </td>
                     </tr>
                     <tr th:if="${#lists.isEmpty(assessmentPage.records)}">
-                        <td colspan="5" class="text-center p-4">没有找到符合条件的风险评估数据。</td>
+                        <td colspan="8" class="text-center p-4">没有找到符合条件的风险评估数据。</td>
                     </tr>
                     </tbody>
                 </table>
@@ -112,13 +157,13 @@
                 <nav aria-label="Page navigation" th:if="${assessmentPage.pages > 1}">
                     <ul class="pagination mb-0">
                         <li class="page-item" th:classappend="${assessmentPage.current == 1} ? 'disabled'">
-                            <a class="page-link" th:href="@{/risk/list(page=${assessmentPage.current - 1}, size=${assessmentPage.size}, customerName=${customerName}, riskLevel=${riskLevel}, sortField=${sortField}, sortOrder=${sortOrder})}">&laquo;</a>
+                            <a class="page-link" th:href="@{/risk/list(page=${assessmentPage.current - 1}, size=${assessmentPage.size}, customerName=${customerName}, riskLevel=${riskLevel}, actualRiskLevel=${actualRiskLevel}, riskDiagnosis=${riskDiagnosis}, sortField=${sortField}, sortOrder=${sortOrder})}">&laquo;</a>
                         </li>
                         <li class="page-item" th:each="pageNum : ${#numbers.sequence(startPage, endPage)}" th:classappend="${pageNum == assessmentPage.current} ? 'active'">
-                            <a class="page-link" th:href="@{/risk/list(page=${pageNum}, size=${assessmentPage.size}, customerName=${customerName}, riskLevel=${riskLevel}, sortField=${sortField}, sortOrder=${sortOrder})}" th:text="${pageNum}"></a>
+                            <a class="page-link" th:href="@{/risk/list(page=${pageNum}, size=${assessmentPage.size}, customerName=${customerName}, riskLevel=${riskLevel}, actualRiskLevel=${actualRiskLevel}, riskDiagnosis=${riskDiagnosis}, sortField=${sortField}, sortOrder=${sortOrder})}" th:text="${pageNum}"></a>
                         </li>
                         <li class="page-item" th:classappend="${assessmentPage.current == assessmentPage.pages} ? 'disabled'">
-                             <a class="page-link" th:href="@{/risk/list(page=${assessmentPage.current + 1}, size=${assessmentPage.size}, customerName=${customerName}, riskLevel=${riskLevel}, sortField=${sortField}, sortOrder=${sortOrder})}">&raquo;</a>
+                             <a class="page-link" th:href="@{/risk/list(page=${assessmentPage.current + 1}, size=${assessmentPage.size}, customerName=${customerName}, riskLevel=${riskLevel}, actualRiskLevel=${actualRiskLevel}, riskDiagnosis=${riskDiagnosis}, sortField=${sortField}, sortOrder=${sortOrder})}">&raquo;</a>
                         </li>
                     </ul>
                 </nav>

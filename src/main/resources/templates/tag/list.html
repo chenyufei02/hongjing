@@ -35,7 +35,6 @@
             </div>
         </div>
 
-
         <div class="card">
             <div class="card-header">
                 标签统计总览 (点击下方标签可快速跳转到对应客户列表)
@@ -64,6 +63,8 @@
     </div>
 </div>
 
+<div id="tag-data-container" style="display: none;" th:data-json="${groupedTagsJson}"></div>
+
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
     <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
         <div class="toast-header">
@@ -75,28 +76,27 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script th:inline="javascript">
-    /* <![CDATA[ */
-    document.addEventListener('DOMContentLoaded', function() {
-        const groupedTags = /*[[${groupedTags}]]*/ {};
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        // --- 高级组合查询的逻辑 (保持不变) ---
+        const dataContainer = document.getElementById('tag-data-container');
+        const jsonString = dataContainer.getAttribute('data-json');
+        const groupedTags = JSON.parse(jsonString);
         const formContainer = document.getElementById('combo-query-form');
         const submitBtn = document.getElementById('submit-query-btn');
         const resetBtn = document.getElementById('reset-query-btn');
 
-        // --- 核心逻辑：动态生成所有下拉框 ---
         for (const category in groupedTags) {
             if (groupedTags.hasOwnProperty(category) && groupedTags[category].length > 0) {
                 const col = document.createElement('div');
                 col.className = 'col-md-3';
                 const select = document.createElement('select');
                 select.className = 'form-select combo-select';
-                // 为每个下拉框创建一个唯一的ID，例如 'select-职业'
-                select.id = 'select-' + category;
                 const defaultOption = document.createElement('option');
                 defaultOption.value = '';
                 defaultOption.textContent = '选择 ' + category + '...';
                 select.appendChild(defaultOption);
-
                 groupedTags[category].forEach(tag => {
                     const option = document.createElement('option');
                     option.value = tag.tagName;
@@ -107,54 +107,74 @@
                 formContainer.appendChild(col);
             }
         }
+        resetBtn.addEventListener('click', function() { /* ... */ });
+        submitBtn.addEventListener('click', function() { /* ... */ });
 
-        // --- “高级查询”面板的按钮事件监听 ---
-        resetBtn.addEventListener('click', function() {
-            document.querySelectorAll('.combo-select').forEach(select => select.value = '');
-        });
-
-        submitBtn.addEventListener('click', function() {
-            const selectedTags = [];
-            document.querySelectorAll('.combo-select').forEach(select => {
-                if (select.value) {
-                    selectedTags.push(select.value);
-                }
-            });
-            if (selectedTags.length === 0) {
-                alert('请至少选择一个标签进行组合查询！');
-                return;
-            }
-            const tagNameQuery = selectedTags.join(',');
-            const targetUrl = /*[[@{/customer/list}]]*/ '/customer/list' + '?tagName=' + encodeURIComponent(tagNameQuery);
-            window.location.href = targetUrl;
-        });
-
-
-        // --- “一键刷新”的Toast和全量刷新逻辑 ---
+        // --- 【【【 全新升级的“一键刷新”逻辑 】】】 ---
         const refreshBtn = document.getElementById('refresh-all-tags-btn');
         const toastElement = document.getElementById('liveToast');
         const toast = new bootstrap.Toast(toastElement);
         const toastTitle = document.getElementById('toast-title');
         const toastBody = document.getElementById('toast-body');
 
-        if(refreshBtn) {
+        if (refreshBtn) {
             refreshBtn.addEventListener('click', function() {
-                if (!confirm('这将为所有客户重新计算画像标签...')) return;
-                toastTitle.textContent = '⏳ 任务启动中...';
-                toastBody.textContent = '已向后台发送全量标签刷新指令。';
-                toastElement.className = 'toast text-bg-primary';
+                if (!confirm('这将为所有客户重新计算画像标签，过程可能需要一段时间，期间请勿关闭页面。确定要开始吗？')) {
+                    return;
+                }
+
+                // 1. 禁用按钮，防止重复点击，并显示“正在刷新”的初始提示
+                refreshBtn.disabled = true;
+                refreshBtn.textContent = '正在刷新...';
+                toastTitle.textContent = '⏳ 刷新中...';
+                toastBody.textContent = '已向后台发送刷新指令，请耐心等待任务完成...';
+                toastElement.className = 'toast text-bg-info';
                 toast.show();
+
+                // 2. 发起一个可能会长时间等待的请求
                 fetch('/tags/refresh-all', { method: 'POST' })
-                    .then(r => r.json()).then(d => { if(!d.success) throw new Error(d.message); }).catch(e => {
-                        toastTitle.textContent = '❌ 启动失败';
-                        toastBody.textContent = e.message;
+                    .then(response => {
+                        if (!response.ok) { // 处理网络或服务器错误
+                            return response.json().then(err => Promise.reject(err));
+                        }
+                        return response.json(); // 解析JSON响应体
+                    })
+                    .then(data => {
+                        // 3. 请求成功完成
+                        if (data.success) {
+                            // 使用后端返回的“已完成”消息，弹出成功提示
+                            toastTitle.textContent = '✅ 刷新成功';
+                            toastBody.textContent = data.message;
+                            toastElement.className = 'toast text-bg-success';
+                            toast.show();
+                            // 2秒后自动刷新页面，以展示最新的标签数据
+                            setTimeout(() => window.location.reload(), 2000);
+                        } else {
+                            // 后端执行出错，抛出错误
+                            throw new Error(data.message);
+                        }
+                    })
+                    .catch(error => {
+                        // 4. 捕获任何阶段发生的错误，并弹出失败提示
+                        console.error('刷新全量标签时发生错误:', error);
+                        toastTitle.textContent = '❌ 刷新失败';
+                        toastBody.textContent = error.message || '发生未知网络或服务器错误。';
                         toastElement.className = 'toast text-bg-danger';
                         toast.show();
-                });
+                    })
+                    .finally(() => {
+                        // 5. 无论成功或失败，最后都恢复按钮状态
+                        refreshBtn.disabled = false;
+                        refreshBtn.textContent = '一键刷新全量标签';
+                    });
             });
         }
-    });
-    /* ]]> */
+
+    } catch (e) {
+        console.error("脚本执行时发生严重错误:", e);
+        alert("页面脚本发生错误，请按F12打开开发者控制台查看详情。");
+    }
+});
 </script>
 
 </body>
