@@ -16,7 +16,7 @@ public interface CustomerMapper extends BaseMapper<Customer> {
 
 
     Page<ProfitLossVO> getProfitLossPage(
-            Page<ProfitLossVO> page, @Param("customerName") String customerName,
+            Page<ProfitLossVO> page, @Param("customerId") Long customerId, @Param("customerName") String customerName,
             @Param("sortField") String sortField, @Param("sortOrder") String sortOrder);
 
 

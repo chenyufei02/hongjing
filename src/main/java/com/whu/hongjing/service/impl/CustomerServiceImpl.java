@@ -129,9 +129,9 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
 
     @Override
-    public Page<ProfitLossVO> getProfitLossPage(Page<ProfitLossVO> page, String customerName, String sortField, String sortOrder) {
-        // 直接调用Mapper中的超级SQL
-        return baseMapper.getProfitLossPage(page, customerName, sortField, sortOrder);
+    public Page<ProfitLossVO> getProfitLossPage(Page<ProfitLossVO> page, Long customerId, String customerName, String sortField, String sortOrder) {
+        // 【已更新】将 customerId 参数传递给Mapper层
+        return baseMapper.getProfitLossPage(page, customerId, customerName, sortField, sortOrder);
     }
 
 

@@ -2,13 +2,15 @@ package com.whu.hongjing.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.whu.hongjing.constants.TaggingConstants;
+import com.whu.hongjing.enums.RiskLevelEnum;
+import com.whu.hongjing.pojo.dto.CustomerDTO;
 import com.whu.hongjing.pojo.dto.CustomerUpdateDTO;
 import com.whu.hongjing.pojo.dto.FundInfoDTO;
-import com.whu.hongjing.pojo.entity.Customer;
-import com.whu.hongjing.pojo.entity.CustomerTagRelation;
-import com.whu.hongjing.pojo.entity.FundInfo;
-import com.whu.hongjing.pojo.vo.FundTransactionVO;
+import com.whu.hongjing.pojo.entity.*;
+import com.whu.hongjing.pojo.vo.*;
 import com.whu.hongjing.service.*;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,21 +20,12 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
-import com.whu.hongjing.pojo.dto.CustomerDTO;
-import com.whu.hongjing.pojo.vo.ProfitLossVO;
-import java.util.Comparator;
-import java.util.List;
-import java.util.stream.Collectors;
-import com.whu.hongjing.pojo.vo.CustomerHoldingVO;
-import com.whu.hongjing.pojo.vo.RiskAssessmentVO;
-import com.whu.hongjing.enums.RiskLevelEnum;
-import java.util.Arrays;
-import com.whu.hongjing.pojo.vo.TagVO;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 专门负责返回页面视图的控制器
@@ -40,7 +33,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Controller
 public class PageController {
 
-    // 注入所有为页面准备数据所需要的Service
     @Autowired
     private CustomerService customerService;
     @Autowired
@@ -53,7 +45,6 @@ public class PageController {
     private FundTransactionService fundTransactionService;
     @Autowired
     private RiskAssessmentService riskAssessmentService;
-    // 注入 Spring Boot 默认配置好的 ObjectMapper
     @Autowired
     private ObjectMapper objectMapper;
 
@@ -67,7 +58,7 @@ public class PageController {
     }
 
     /**
-     * 显示客户列表页面 (将原来CustomerController里的页面逻辑搬到这里)
+     * 显示客户列表页面
      */
     @GetMapping("/customer/list")
     public String customerList(Model model,
@@ -76,8 +67,7 @@ public class PageController {
            @RequestParam(value = "id", required = false) Long customerId,
            @RequestParam(value = "name", required = false) String name,
            @RequestParam(value = "idNumber", required = false) String idNumber,
-           @RequestParam(value = "tagName", required = false) String tagName)
-    {
+           @RequestParam(value = "tagName", required = false) String tagName) {
 
         Page<Customer> customerPage = new Page<>(pageNum, pageSize);
         customerService.getCustomerPage(customerPage, customerId, name, idNumber, tagName);
@@ -86,7 +76,10 @@ public class PageController {
         if (customerPage.getPages() > 5) {
             startPage = Math.max(1, (int)customerPage.getCurrent() - 2);
             endPage = Math.min((int)customerPage.getPages(), startPage + 4);
-            if (endPage == customerPage.getPages()) {
+            if (endPage > customerPage.getPages()) {
+                endPage = (int) customerPage.getPages();
+            }
+            if (endPage - startPage < 4) {
                 startPage = Math.max(1, endPage - 4);
             }
         }
@@ -103,20 +96,19 @@ public class PageController {
         return "customer/list";
     }
 
-
     /**
      * 显示新增客户的表单页面
      */
     @GetMapping("/customer/add")
     public String showAddForm(Model model) {
         model.addAttribute("customerDTO", new CustomerDTO());
-        model.addAttribute("activeUri", "/customer/list"); // 用于侧边栏高亮
+        model.addAttribute("activeUri", "/customer/list");
         return "customer/add";
     }
 
-
     /**
-     * 显示客户详情页面，加载基础信息、分组后的标签、盈亏统计，最终版Pro：支持高级分组与排序
+     * 【最终重构版：无任何冗余代码，逻辑清晰】
+     * 显示客户详情页面，加载所有必要数据
      */
     @GetMapping("/customer/detail/{id}")
     public String showDetailView(
@@ -124,123 +116,55 @@ public class PageController {
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String idNumber,
             @RequestParam(required = false) String tagName,
-            @RequestParam(required = false) String returnUrl)
-    {
+            @RequestParam(required = false) String returnUrl) {
+
+        // 1. 获取客户基础数据
         Customer customer = customerService.getCustomerById(id);
         if (customer == null) {
             return "redirect:/customer/list";
         }
-
-        // 1. 获取该客户的所有标签关系
-        List<CustomerTagRelation> allTags = customerTagRelationService.list(
-                new QueryWrapper<CustomerTagRelation>().eq("customer_id", id)
-        );
-
-        // 2. 【核心改造】按最终布局要求，准备5个独立的标签列表
-        // a. 基础画像 (年龄/性别/职业)
-        List<CustomerTagRelation> basicProfileTags = allTags.stream().filter(t ->
-                t.getTagCategory().equals(TaggingConstants.CATEGORY_AGE) ||
-                t.getTagCategory().equals(TaggingConstants.CATEGORY_GENDER) ||
-                t.getTagCategory().equals(TaggingConstants.CATEGORY_OCCUPATION)
-        ).collect(Collectors.toList());
-
-        // b. 资产规模
-        List<CustomerTagRelation> assetTags = allTags.stream().filter(t ->
-                t.getTagCategory().equals(TaggingConstants.CATEGORY_ASSET)
-        ).collect(Collectors.toList());
-
-        // c. 投资风格
-        List<CustomerTagRelation> styleTags = allTags.stream().filter(t ->
-                t.getTagCategory().equals(TaggingConstants.CATEGORY_STYLE)
-        ).collect(Collectors.toList());
-
-        // d. 交易习惯 (近期R + 历史F) -> 内部排序
-        List<String> tradingHabitOrder = List.of(TaggingConstants.CATEGORY_RECENCY, TaggingConstants.CATEGORY_FREQUENCY);
-        List<CustomerTagRelation> tradingHabitTags = allTags.stream().filter(t ->
-                tradingHabitOrder.contains(t.getTagCategory())
-        ).sorted(Comparator.comparing(t -> tradingHabitOrder.indexOf(t.getTagCategory())))
-         .collect(Collectors.toList());
-
-        // e. 风险状况 (申报 + 实盘 + 诊断) -> 内部排序
-        List<String> riskProfileOrder = List.of(TaggingConstants.CATEGORY_RISK_DECLARED, TaggingConstants.CATEGORY_RISK_ACTUAL, TaggingConstants.CATEGORY_RISK_DIAGNOSIS);
-        List<CustomerTagRelation> riskProfileTags = allTags.stream().filter(t ->
-                riskProfileOrder.contains(t.getTagCategory())
-        ).sorted(Comparator.comparing(t -> riskProfileOrder.indexOf(t.getTagCategory())))
-         .collect(Collectors.toList());
-
-        // 3. 获取客户的盈亏与资产统计数据 (逻辑不变)
-        ProfitLossVO profitLossVO = customerService.getProfitLossVO(id);
-
-        // 4. 将所有数据放入 Model
         model.addAttribute("customer", customer);
-        model.addAttribute("stats", profitLossVO);
-        model.addAttribute("basicProfileTags", basicProfileTags);
-        model.addAttribute("assetTags", assetTags);
-        model.addAttribute("styleTags", styleTags);
-        model.addAttribute("tradingHabitTags", tradingHabitTags);
-        model.addAttribute("riskProfileTags", riskProfileTags);
-
+        model.addAttribute("stats", customerService.getProfitLossVO(id));
         model.addAttribute("activeUri", "/customer/list");
         model.addAttribute("backUrl", buildBackUrl(name, idNumber, tagName, returnUrl));
+
+        // 2. 获取并处理所有标签，用于分组展示
+        List<CustomerTagRelation> allTags = customerTagRelationService.list(new QueryWrapper<CustomerTagRelation>().eq("customer_id", id));
+        model.addAttribute("basicProfileTags", filterTagsByCategory(allTags, List.of(TaggingConstants.CATEGORY_AGE, TaggingConstants.CATEGORY_GENDER, TaggingConstants.CATEGORY_OCCUPATION)));
+        model.addAttribute("assetTags", filterTagsByCategory(allTags, List.of(TaggingConstants.CATEGORY_ASSET)));
+        model.addAttribute("styleTags", filterTagsByCategory(allTags, List.of(TaggingConstants.CATEGORY_STYLE)));
+        model.addAttribute("tradingHabitTags", sortAndFilterTags(allTags, List.of(TaggingConstants.CATEGORY_RECENCY, TaggingConstants.CATEGORY_FREQUENCY)));
+        model.addAttribute("riskProfileTags", sortAndFilterTags(allTags, List.of(TaggingConstants.CATEGORY_RISK_DECLARED, TaggingConstants.CATEGORY_RISK_ACTUAL, TaggingConstants.CATEGORY_RISK_DIAGNOSIS)));
+
+        // 3. 准备图表所需的数据
+        prepareChartData(id, model);
+        prepareHistoricalData(id, model);
 
         return "customer/detail";
     }
 
-
     /**
-     * 【私有辅助方法】用于从其他链接跳转到客户列表查看详情时，可以顺利返回其他链接。用于构建带查询参数的返回URL。
-     */
-    private String buildBackUrl(String name, String idNumber, String tagName, String returnUrl) {
-        // 1. 优先判断是否有从其他页面（如持仓、交易页）传来的完整返回地址
-        if (StringUtils.hasText(returnUrl)) {
-            // 如果有，直接使用，这是最高优先级
-            return returnUrl;
-        }
-
-        // 2. 如果没有returnUrl，则说明是从客户管理页来的，我们构建返回到客户管理页的链接
-        StringBuilder url = new StringBuilder("/customer/list?from=details"); // from参数只是为了让URL不为空
-        if (StringUtils.hasText(name)) {
-            url.append("&name=").append(name);
-        }
-        if (StringUtils.hasText(idNumber)) {
-            url.append("&idNumber=").append(idNumber);
-        }
-        if (StringUtils.hasText(tagName)) {
-            url.append("&tagName=").append(tagName);
-        }
-        return url.toString();
-    }
-
-
-
-    /**
-     * 显示编辑客户的表单页面，并保留查询参数用于返回
+     * 显示编辑客户的表单页面
      */
     @GetMapping("/customer/edit/{id}")
     public String showEditForm(@PathVariable Long id, Model model,
            @RequestParam(required = false) String name,
            @RequestParam(required = false) String idNumber,
-           @RequestParam(required = false) String tagName)
-    {
+           @RequestParam(required = false) String tagName) {
         Customer customer = customerService.getCustomerById(id);
         if (customer == null) {
             return "redirect:/customer/list";
         }
-
-        CustomerUpdateDTO customerUpdateDTO = new CustomerUpdateDTO();
-        BeanUtils.copyProperties(customer, customerUpdateDTO);
-
-        model.addAttribute("customerUpdateDTO", customerUpdateDTO);
+        CustomerUpdateDTO dto = new CustomerUpdateDTO();
+        BeanUtils.copyProperties(customer, dto);
+        model.addAttribute("customerUpdateDTO", dto);
         model.addAttribute("activeUri", "/customer/list");
-        // 【关键】将查询参数拼接到返回URL中
-        model.addAttribute("backUrl", buildBackUrl(name, idNumber, tagName));
+        model.addAttribute("backUrl", buildBackUrl(name, idNumber, tagName, null));
         return "customer/edit";
     }
 
-
-
     /**
-     * 显示基金信息列表页面, 增加分页和查询功能
+     * 显示基金信息列表页面
      */
     @GetMapping("/fund/list")
     public String fundList(Model model,
@@ -249,42 +173,24 @@ public class PageController {
            @RequestParam(required = false) String fundCode,
            @RequestParam(required = false) String fundName,
            @RequestParam(required = false) String fundType,
-           @RequestParam(required = false) Integer riskScore)
-    {
-
+           @RequestParam(required = false) Integer riskScore) {
         Page<FundInfo> fundPage = new Page<>(pageNum, pageSize);
-        // 调用我们新创建的服务方法
         fundInfoService.getFundInfoPage(fundPage, fundCode, fundName, fundType, riskScore);
-
-        // 分页导航栏的计算逻辑 (与客户管理保持一致)
         int startPage = 1, endPage = (int) fundPage.getPages();
         if (fundPage.getPages() > 5) {
             startPage = Math.max(1, (int)fundPage.getCurrent() - 2);
             endPage = Math.min((int)fundPage.getPages(), startPage + 4);
-            if (endPage == fundPage.getPages()) {
-                startPage = Math.max(1, endPage - 4);
-            }
         }
-
         model.addAttribute("fundPage", fundPage);
         model.addAttribute("startPage", startPage);
         model.addAttribute("endPage", endPage);
         model.addAttribute("activeUri", "/fund/list");
-        // 将查询参数传回给前端，用于表单回显和分页链接
         model.addAttribute("fundCode", fundCode);
         model.addAttribute("fundName", fundName);
         model.addAttribute("fundType", fundType);
         model.addAttribute("riskScore", riskScore);
-
-        // 从所有基金中提取出不重复的基金类型，用于查询下拉框
-        List<String> fundTypes = fundInfoService.list().stream()
-                .map(FundInfo::getFundType)
-                .distinct()
-                .sorted()
-                .collect(Collectors.toList());
+        List<String> fundTypes = fundInfoService.list().stream().map(FundInfo::getFundType).distinct().sorted().collect(Collectors.toList());
         model.addAttribute("fundTypes", fundTypes);
-
-
         return "fund/list";
     }
 
@@ -292,299 +198,397 @@ public class PageController {
      * 显示新增基金的表单页面
      */
     @GetMapping("/fund/add")
-    public String showAddFundForm(Model model)
-    {
+    public String showAddFundForm(Model model) {
         model.addAttribute("fundInfoDTO", new FundInfoDTO());
-        model.addAttribute("activeUri", "/fund/list"); // 保持侧边栏在"基金管理"高亮
+        model.addAttribute("activeUri", "/fund/list");
         return "fund/add";
     }
-
-    // 后续所有其他模块的列表、新增、编辑页面，我们都在这里继续添加方法...
 
     /**
      * 显示客户持仓列表页面
      */
     @GetMapping("/holding/list")
-    public String holdingList(
-            Model model,
+    public String holdingList(Model model,
             @RequestParam(value = "page", defaultValue = "1") int pageNum,
             @RequestParam(value = "size", defaultValue = "10") int pageSize,
             @RequestParam(required = false) String customerName,
             @RequestParam(required = false) String fundCode,
-            @RequestParam(required = false, defaultValue = "lastUpdateDate") String sortField,
-            // 持仓数据倒序显示最近更新过的
-            @RequestParam(required = false, defaultValue = "desc") String sortOrder)
-    {
+            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
         Page<CustomerHoldingVO> holdingPage = new Page<>(pageNum, pageSize);
-        // 调用我们新创建的服务方法
-        customerHoldingService.getHoldingPage(holdingPage, customerName,
-                fundCode, sortField, sortOrder);
-
-        // 分页导航栏的计算逻辑
+        customerHoldingService.getHoldingPage(holdingPage, customerName, fundCode, sortField, sortOrder);
         int startPage = 1, endPage = (int) holdingPage.getPages();
         if (holdingPage.getPages() > 5) {
             startPage = Math.max(1, (int)holdingPage.getCurrent() - 2);
             endPage = Math.min((int)holdingPage.getPages(), startPage + 4);
-            if (endPage == holdingPage.getPages()) {
-                startPage = Math.max(1, endPage - 4);
-            }
         }
-
         model.addAttribute("holdingPage", holdingPage);
         model.addAttribute("startPage", startPage);
         model.addAttribute("endPage", endPage);
         model.addAttribute("activeUri", "/holding/list");
-        // 将查询参数传回给前端，用于表单回显和分页
         model.addAttribute("customerName", customerName);
         model.addAttribute("fundCode", fundCode);
-        // 【关键】将当前的排序状态传回给前端
         model.addAttribute("sortField", sortField);
         model.addAttribute("sortOrder", sortOrder);
-        // 【关键】传递一个反转后的排序顺序，方便前端生成链接
         model.addAttribute("reversedSortOrder", "asc".equals(sortOrder) ? "desc" : "asc");
-
-
         return "holding/list";
     }
-
 
     /**
      * 显示交易流水列表页面
      */
     @GetMapping("/transaction/list")
-    public String transactionList(
-            Model model,
+    public String transactionList(Model model,
             @RequestParam(value = "page", defaultValue = "1") int pageNum,
             @RequestParam(value = "size", defaultValue = "10") int pageSize,
             @RequestParam(required = false) String customerName,
             @RequestParam(required = false) String fundCode,
             @RequestParam(required = false) String transactionType,
-            @RequestParam(required = false, defaultValue = "transactionTime") String sortField,
-            // 交易数据倒序显示最近发生的交易
-            @RequestParam(required = false, defaultValue = "desc") String sortOrder)
-    {
-
+            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
         Page<FundTransactionVO> transactionPage = new Page<>(pageNum, pageSize);
-        // 调用我们新创建的服务方法
         fundTransactionService.getTransactionPage(transactionPage, customerName, fundCode, transactionType, sortField, sortOrder);
-
-        // 分页导航栏的计算逻辑
         int startPage = 1, endPage = (int) transactionPage.getPages();
         if (transactionPage.getPages() > 5) {
             startPage = Math.max(1, (int)transactionPage.getCurrent() - 2);
             endPage = Math.min((int)transactionPage.getPages(), startPage + 4);
-            if (endPage == transactionPage.getPages()) {
-                startPage = Math.max(1, endPage - 4);
-            }
         }
-
         model.addAttribute("transactionPage", transactionPage);
         model.addAttribute("startPage", startPage);
         model.addAttribute("endPage", endPage);
         model.addAttribute("activeUri", "/transaction/list");
-        // 将查询参数传回给前端，用于表单回显和分页
         model.addAttribute("customerName", customerName);
         model.addAttribute("fundCode", fundCode);
         model.addAttribute("transactionType", transactionType);
-        // 【关键】将当前的排序状态传回给前端
         model.addAttribute("sortField", sortField);
         model.addAttribute("sortOrder", sortOrder);
-        // 【关键】传递一个反转后的排序顺序，方便前端生成链接
         model.addAttribute("reversedSortOrder", "asc".equals(sortOrder) ? "desc" : "asc");
-
-
         return "transaction/list";
     }
 
-
     /**
-     * 【最终形态】显示风险评估列表页面，支持多维度查询
+     * 显示风险评估列表页面
      */
     @GetMapping("/risk/list")
-    public String riskList(
-            Model model,
+    public String riskList(Model model,
             @RequestParam(value = "page", defaultValue = "1") int pageNum,
             @RequestParam(value = "size", defaultValue = "10") int pageSize,
             @RequestParam(required = false) String customerName,
             @RequestParam(required = false) String riskLevel,
-            // --- 【【【 新增的请求参数 】】】 ---
             @RequestParam(required = false) String actualRiskLevel,
             @RequestParam(required = false) String riskDiagnosis,
-            @RequestParam(required = false, defaultValue = "customerId") String sortField,
-            @RequestParam(required = false, defaultValue = "asc") String sortOrder)
-    {
+            @RequestParam(required = false, defaultValue = "id") String sortField,
+            @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
         Page<RiskAssessmentVO> assessmentPage = new Page<>(pageNum, pageSize);
-        // 同时传递排序参数
-        riskAssessmentService.getAssessmentPage(assessmentPage, customerName, riskLevel,
-                actualRiskLevel, riskDiagnosis, sortField, sortOrder);
-
-        // 分页导航栏的计算逻辑
+        riskAssessmentService.getAssessmentPage(assessmentPage, customerName, riskLevel, actualRiskLevel, riskDiagnosis, sortField, sortOrder);
         int startPage = 1, endPage = (int) assessmentPage.getPages();
         if (assessmentPage.getPages() > 5) {
             startPage = Math.max(1, (int)assessmentPage.getCurrent() - 2);
             endPage = Math.min((int)assessmentPage.getPages(), startPage + 4);
-            if (endPage == assessmentPage.getPages()) {
-                startPage = Math.max(1, endPage - 4);
-            }
         }
-
-        // --- 【【【 新增的数据准备 】】】 ---
-        // a. 准备“风险诊断”下拉框的选项列表
-        List<String> riskDiagnoses = List.of(
-            TaggingConstants.LABEL_DIAGNOSIS_OVERWEIGHT,
-            TaggingConstants.LABEL_DIAGNOSIS_MATCH,
-            TaggingConstants.LABEL_DIAGNOSIS_UNDERWEIGHT
-        );
-        model.addAttribute("riskDiagnoses", riskDiagnoses);
-
-        // b. 准备“申报/实盘风险”下拉框的选项列表 (逻辑不变)
-        List<String> riskLevels = Arrays.stream(RiskLevelEnum.values())
-                .map(RiskLevelEnum::getLevelName)
-                .collect(Collectors.toList());
-        model.addAttribute("riskLevels", riskLevels);
-
-        // --- 将所有查询参数传回给前端，用于表单回显 ---
+        model.addAttribute("riskDiagnoses", List.of(TaggingConstants.LABEL_DIAGNOSIS_OVERWEIGHT, TaggingConstants.LABEL_DIAGNOSIS_MATCH, TaggingConstants.LABEL_DIAGNOSIS_UNDERWEIGHT));
+        model.addAttribute("riskLevels", Arrays.stream(RiskLevelEnum.values()).map(RiskLevelEnum::getLevelName).collect(Collectors.toList()));
         model.addAttribute("assessmentPage", assessmentPage);
         model.addAttribute("startPage", startPage);
         model.addAttribute("endPage", endPage);
         model.addAttribute("activeUri", "/risk/list");
         model.addAttribute("customerName", customerName);
         model.addAttribute("riskLevel", riskLevel);
-        model.addAttribute("actualRiskLevel", actualRiskLevel); // <-- 新增
-        model.addAttribute("riskDiagnosis", riskDiagnosis);   // <-- 新增
+        model.addAttribute("actualRiskLevel", actualRiskLevel);
+        model.addAttribute("riskDiagnosis", riskDiagnosis);
         model.addAttribute("sortField", sortField);
         model.addAttribute("sortOrder", sortOrder);
         model.addAttribute("reversedSortOrder", "asc".equals(sortOrder) ? "desc" : "asc");
-
         return "risk/list";
     }
 
-
     /**
-     * 【升级版】显示标签管理页面, 按类别分组展示
+     * 显示标签管理页面
      */
     @GetMapping("/tag/list")
-    public String tagList(Model model)
-    {
-        // 1. 调用服务，获取所有标签的统计数据
+    public String tagList(Model model) throws JsonProcessingException {
         List<TagVO> allTags = customerTagRelationService.getTagStats();
-
-        // 2. 定义我们期望的“黄金排序规则”，确保页面下拉框顺序稳定
         List<String> categoryOrder = List.of(
-            TaggingConstants.CATEGORY_AGE,
-            TaggingConstants.CATEGORY_GENDER,
-            TaggingConstants.CATEGORY_OCCUPATION,
-            TaggingConstants.CATEGORY_STYLE,
-            TaggingConstants.CATEGORY_ASSET,
-            TaggingConstants.CATEGORY_RECENCY,
-            TaggingConstants.CATEGORY_FREQUENCY,
-            TaggingConstants.CATEGORY_RISK_DECLARED,
-            TaggingConstants.CATEGORY_RISK_ACTUAL,
-            TaggingConstants.CATEGORY_RISK_DIAGNOSIS
-        );
-
-        // 3. 将标签列表按预定义的类别顺序分组
-        Map<String, List<TagVO>> groupedTags = categoryOrder.stream()
-            .collect(Collectors.toMap(
-                cat -> cat,
-                cat -> allTags.stream()
-                                   .filter(tag -> cat.equals(tag.getTagCategory()))
-                                   .collect(Collectors.toList()),
-                (e1, e2) -> e1,
-                LinkedHashMap::new // 使用LinkedHashMap来保持插入顺序
-            ));
-
-        // --- 【【【 新增的核心改造逻辑 】】】 ---
-        // a. 将 groupedTags 对象手动序列化为JSON字符串
-        String groupedTagsJson = "{}"; // 提供一个安全的默认值
-        try {
-            groupedTagsJson = objectMapper.writeValueAsString(groupedTags);
-        } catch (JsonProcessingException e) {
-            // 在生产环境中，这里应该使用日志框架记录错误
-            e.printStackTrace();
-        }
-
-        // b. 将原始Map对象（供下方th:each使用）和新的JSON字符串（供JS使用）都放入Model
+            TaggingConstants.CATEGORY_AGE, TaggingConstants.CATEGORY_GENDER, TaggingConstants.CATEGORY_OCCUPATION,
+            TaggingConstants.CATEGORY_STYLE, TaggingConstants.CATEGORY_ASSET, TaggingConstants.CATEGORY_RECENCY,
+            TaggingConstants.CATEGORY_FREQUENCY, TaggingConstants.CATEGORY_RISK_DECLARED,
+            TaggingConstants.CATEGORY_RISK_ACTUAL, TaggingConstants.CATEGORY_RISK_DIAGNOSIS);
+        Map<String, List<TagVO>> groupedTags = categoryOrder.stream().collect(Collectors.toMap(
+                Function.identity(),
+                cat -> allTags.stream().filter(tag -> cat.equals(tag.getTagCategory())).collect(Collectors.toList()),
+                (e1, e2) -> e1, LinkedHashMap::new));
         model.addAttribute("groupedTags", groupedTags);
-        model.addAttribute("groupedTagsJson", groupedTagsJson); // <-- 新增
+        model.addAttribute("groupedTagsJson", objectMapper.writeValueAsString(groupedTags));
         model.addAttribute("activeUri", "/tag/list");
-
         return "tag/list";
     }
 
-
     /**
-     * 【修正版】显示可视化画像仪表盘页面
+     * 显示可视化画像仪表盘页面
      */
     @GetMapping("/visualization/dashboard")
     public String showDashboard(Model model) {
         model.addAttribute("activeUri", "/visualization/dashboard");
-        // 【【【 关键修正 】】】
-        // 确保这里返回的是正确的页面路径
         return "visualization/dashboard";
     }
 
-
     /**
-     * 【最终性能版】显示客户盈亏排行榜页面（支持分页、搜索、多字段排序）
+     * 显示客户盈亏排行榜页面
      */
     @GetMapping("/profitloss/list")
     public String profitLossList(Model model,
                                  @RequestParam(value = "page", defaultValue = "1") int pageNum,
                                  @RequestParam(value = "size", defaultValue = "10") int pageSize,
-                                 // 确保这里能接收 customerName
+                                 @RequestParam(required = false) Long customerId,
                                  @RequestParam(required = false) String customerName,
-                                 @RequestParam(required = false, defaultValue = "customerId") String sortField,
-                                 @RequestParam(required = false, defaultValue = "asc") String sortOrder) {
-
+                                 @RequestParam(required = false, defaultValue = "totalProfitLoss") String sortField,
+                                 @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
         Page<ProfitLossVO> page = new Page<>(pageNum, pageSize);
-
-        List<String> allowedSortFields = List.of("customerId", "totalMarketValue", "totalProfitLoss", "profitLossRate");
-        String dbSortField = null;
-        if (allowedSortFields.contains(sortField)) {
-            dbSortField = sortField;
-        }
-
-        // 确保 customerName 被传递到服务层
-        customerService.getProfitLossPage(page, customerName, dbSortField, sortOrder);
+        customerService.getProfitLossPage(page, customerId, customerName, sortField, sortOrder);
 
         int startPage = 1, endPage = (int) page.getPages();
         if (page.getPages() > 5) {
             startPage = Math.max(1, (int)page.getCurrent() - 2);
             endPage = Math.min((int)page.getPages(), startPage + 4);
-            if (endPage == page.getPages()) {
-                startPage = Math.max(1, endPage - 4);
-            }
         }
-
         model.addAttribute("statsPage", page);
         model.addAttribute("startPage", startPage);
         model.addAttribute("endPage", endPage);
         model.addAttribute("activeUri", "/profitloss/list");
-        // 确保 customerName 被传回前端，用于搜索框回显
+        model.addAttribute("customerId", customerId);
         model.addAttribute("customerName", customerName);
         model.addAttribute("sortField", sortField);
         model.addAttribute("sortOrder", sortOrder);
         model.addAttribute("reversedSortOrder", "asc".equals(sortOrder) ? "desc" : "asc");
-
         return "profitloss/list";
     }
 
+    // ========== 私有辅助方法 (Private Helper Methods) ==========
+
+    private void prepareChartData(Long customerId, Model model) {
+        List<CustomerHolding> holdings = customerHoldingService.listByCustomerId(customerId);
+        if (holdings == null || holdings.isEmpty()) {
+            setEmptyChartData(model);
+            return;
+        }
+
+        BigDecimal totalMarketValue = holdings.stream().map(CustomerHolding::getMarketValue).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (totalMarketValue.compareTo(BigDecimal.ZERO) <= 0) {
+            setEmptyChartData(model);
+            return;
+        }
+
+        List<String> fundCodes = holdings.stream().map(CustomerHolding::getFundCode).distinct().collect(Collectors.toList());
+        Map<String, FundInfo> fundInfoMap = fundInfoService.listByIds(fundCodes).stream().collect(Collectors.toMap(FundInfo::getFundCode, Function.identity()));
+
+        Map<String, BigDecimal> assetAllocationData = holdings.stream()
+                .filter(h -> fundInfoMap.get(h.getFundCode()) != null && h.getMarketValue() != null && fundInfoMap.get(h.getFundCode()).getFundType() != null)
+                .collect(Collectors.groupingBy(h -> fundInfoMap.get(h.getFundCode()).getFundType(),
+                        Collectors.reducing(BigDecimal.ZERO, CustomerHolding::getMarketValue, BigDecimal::add)));
+
+        Map<String, BigDecimal> riskInsightData = calculateRiskInsightData(customerId, holdings, fundInfoMap, totalMarketValue);
+
+        // b. 【【【 新增：为图表定义统一的颜色映射 】】】
+        Map<String, String> colorMap = new LinkedHashMap<>();
+        colorMap.put("股票型", "#FF6384");
+        colorMap.put("指数型", "#FF9F40");
+        colorMap.put("混合型", "#FFCE56");
+        colorMap.put("债券型", "#4BC0C0");
+        colorMap.put("货币型", "#9966FF");
+        colorMap.put("FOF", "#36A2EB");
+        colorMap.put("QDII", "#C9CBCF");
+        colorMap.put("Reits", "#8D6E63");
+        // 为其他所有未明确定义的类型提供一个备用颜色列表
+        List<String> fallbackColors = List.of("#E7E9ED", "#77DD77", "#FDFD96", "#836953", "#FFB347");
+        int fallbackIndex = 0;
+        for (String type : assetAllocationData.keySet()) {
+            if (!colorMap.containsKey(type)) {
+                colorMap.put(type, fallbackColors.get(fallbackIndex % fallbackColors.size()));
+                fallbackIndex++;
+            }
+        }
+
+        try {
+            model.addAttribute("assetAllocationJson", objectMapper.writeValueAsString(assetAllocationData));
+            model.addAttribute("riskInsightJson", objectMapper.writeValueAsString(riskInsightData));
+            model.addAttribute("colorMapJson", objectMapper.writeValueAsString(colorMap));
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+            setEmptyChartData(model);
+        }
+    }
 
     /**
-     * 【私有辅助方法】 用于在本身的链接里面查看详情了以后能够顺利带着查询后的参数和结果返回本身的链接
+     * 【【【 最终版：为历史走势双曲线图和资金流图准备数据 】】】
      */
-    private String buildBackUrl(String name, String idNumber, String tagName) {
-        StringBuilder url = new StringBuilder("/customer/list?from=details"); // from参数只是为了让URL不为空
-        if (name != null && !name.isEmpty()) {
-            url.append("&name=").append(name);
+    private void prepareHistoricalData(Long customerId, Model model) {
+        List<FundTransaction> transactions = fundTransactionService.list(
+            new QueryWrapper<FundTransaction>().eq("customer_id", customerId).orderByAsc("transaction_time")
+        );
+
+        if (transactions == null || transactions.isEmpty()) {
+            model.addAttribute("historicalDataJson", "{}");
+            model.addAttribute("monthlyFlowJson", "{}");
+            return;
         }
-        if (idNumber != null && !idNumber.isEmpty()) {
-            url.append("&idNumber=").append(idNumber);
+
+        // --- 计算1：双曲线图（资产总额 vs 累计净投入） ---
+        Map<String, Map<String, BigDecimal>> historicalData = new LinkedHashMap<>();
+        BigDecimal cumulativeInvestment = BigDecimal.ZERO;
+        Map<String, BigDecimal> currentShares = new HashMap<>();
+
+        for (FundTransaction tx : transactions) {
+            String date = tx.getTransactionTime().toLocalDate().toString();
+            String fundCode = tx.getFundCode();
+
+            // 更新累计净投入 (现金流口径)
+            if ("申购".equals(tx.getTransactionType())) {
+                cumulativeInvestment = cumulativeInvestment.add(tx.getTransactionAmount());
+            } else {
+                cumulativeInvestment = cumulativeInvestment.subtract(tx.getTransactionAmount());
+            }
+
+            // 更新份额
+            BigDecimal shares = currentShares.getOrDefault(fundCode, BigDecimal.ZERO);
+            if ("申购".equals(tx.getTransactionType())) {
+                currentShares.put(fundCode, shares.add(tx.getTransactionShares()));
+            } else {
+                currentShares.put(fundCode, shares.subtract(tx.getTransactionShares()));
+            }
+
+            // 使用【所有】基金的【当前】份额 和 【当天】的成交价来估算总市值
+            BigDecimal totalMarketValue = BigDecimal.ZERO;
+            for(Map.Entry<String, BigDecimal> entry : currentShares.entrySet()) {
+                // 这里用当天交易的基金净值，去估算所有持仓的市值，是简化方案A的核心
+                totalMarketValue = totalMarketValue.add(
+                    entry.getValue().multiply(tx.getSharePrice() != null ? tx.getSharePrice() : BigDecimal.ONE)
+                );
+            }
+
+            Map<String, BigDecimal> dailyData = new HashMap<>();
+            dailyData.put("assets", totalMarketValue.setScale(2, RoundingMode.HALF_UP));
+            dailyData.put("investment", cumulativeInvestment.setScale(2, RoundingMode.HALF_UP));
+            historicalData.put(date, dailyData);
         }
-        if (tagName != null && !tagName.isEmpty()) {
-            url.append("&tagName=").append(tagName);
+
+        // --- 计算2：月度资金净流入/流出 ---
+        Map<String, BigDecimal> monthlyFlowData = transactions.stream()
+            .collect(Collectors.groupingBy(
+                tx -> tx.getTransactionTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM")),
+                Collectors.mapping(
+                    tx -> "申购".equals(tx.getTransactionType()) ? tx.getTransactionAmount() : tx.getTransactionAmount().negate(),
+                    Collectors.reducing(BigDecimal.ZERO, BigDecimal::add)
+                )
+            ));
+
+        // 按月份排序
+        Map<String, BigDecimal> sortedMonthlyFlow = new LinkedHashMap<>();
+        monthlyFlowData.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEachOrdered(e -> sortedMonthlyFlow.put(e.getKey(), e.getValue()));
+
+        // --- 将数据转换为JSON ---
+        try {
+            model.addAttribute("historicalDataJson", objectMapper.writeValueAsString(historicalData));
+            model.addAttribute("monthlyFlowJson", objectMapper.writeValueAsString(sortedMonthlyFlow));
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+            model.addAttribute("historicalDataJson", "{}");
+            model.addAttribute("monthlyFlowJson", "{}");
         }
+    }
+
+
+
+    /**
+     * 【【【 最终版：封装风险洞察雷达图的数据计算过程，统一风险指向性 】】】
+     */
+    private Map<String, BigDecimal> calculateRiskInsightData(Long customerId, List<CustomerHolding> holdings, Map<String, FundInfo> fundInfoMap, BigDecimal totalMarketValue) {
+        // --- 基础数据计算 (不变) ---
+        BigDecimal highRiskValue = filterAndSum(holdings, fundInfoMap, List.of("股票型", "指数型"));
+        BigDecimal midHighRiskValue = filterAndSum(holdings, fundInfoMap, List.of("混合型"));
+        BigDecimal lowRiskValue = filterAndSum(holdings, fundInfoMap, List.of("货币型"));
+        BigDecimal topHoldingValue = holdings.stream().map(CustomerHolding::getMarketValue).filter(Objects::nonNull).max(Comparator.naturalOrder()).orElse(BigDecimal.ZERO);
+        BigDecimal allInvestableValue = highRiskValue.add(midHighRiskValue).add(filterAndSum(holdings, fundInfoMap, List.of("债券型")));
+
+        // --- 核心逻辑改造 ---
+        Map<String, BigDecimal> riskInsightData = new LinkedHashMap<>();
+        BigDecimal hundred = new BigDecimal(100);
+
+        // 维度1：风险暴露度 (不变)
+        riskInsightData.put("风险暴露度", highRiskValue.add(midHighRiskValue).divide(totalMarketValue, 4, RoundingMode.HALF_UP).multiply(hundred));
+        // 维度2：投资进攻性 (不变)
+        riskInsightData.put("投资进攻性", allInvestableValue.compareTo(BigDecimal.ZERO) > 0 ? highRiskValue.divide(allInvestableValue, 4, RoundingMode.HALF_UP).multiply(hundred) : BigDecimal.ZERO);
+        // 维度3：持仓集中度 (不变)
+        riskInsightData.put("持仓集中度", topHoldingValue.divide(totalMarketValue, 4, RoundingMode.HALF_UP).multiply(hundred));
+
+        // 维度4：【【【 改造为“知行不匹配度” 】】】
+        // 首先获取诊断标签，然后转换为“不匹配”分数 (0, 40, 80)
+        String diagnosisTag = customerTagRelationService.list(new QueryWrapper<CustomerTagRelation>().eq("customer_id", customerId).eq("tag_category", TaggingConstants.CATEGORY_RISK_DIAGNOSIS))
+                .stream().map(CustomerTagRelation::getTagName).findFirst().orElse("");
+        riskInsightData.put("行为激进程度", calculateAggressivenessScore(diagnosisTag));
+        // 维度5：【【【 改造为“流动性风险” 】】】
+        // 计算(100 - 流动性储备百分比)
+        BigDecimal liquidityReserve = lowRiskValue.divide(totalMarketValue, 4, RoundingMode.HALF_UP).multiply(hundred);
+        riskInsightData.put("流动性风险", hundred.subtract(liquidityReserve));
+
+        return riskInsightData;
+    }
+
+    private List<CustomerTagRelation> filterTagsByCategory(List<CustomerTagRelation> allTags, List<String> categories) {
+        return allTags.stream().filter(t -> categories.contains(t.getTagCategory())).collect(Collectors.toList());
+    }
+
+    private List<CustomerTagRelation> sortAndFilterTags(List<CustomerTagRelation> allTags, List<String> orderedCategories) {
+        return allTags.stream().filter(t -> orderedCategories.contains(t.getTagCategory()))
+                .sorted(Comparator.comparing(t -> orderedCategories.indexOf(t.getTagCategory()))).collect(Collectors.toList());
+    }
+
+    private void setEmptyChartData(Model model) {
+        model.addAttribute("assetAllocationJson", "{}");
+        model.addAttribute("riskInsightJson", "{}");
+        model.addAttribute("colorMapJson", "{}");
+    }
+
+    /**
+     * 【最终版】计算客户的行为激进程度分数
+     * @param diagnosisTag 客户的风险诊断标签
+     * @return 0 (保守/未知), 50 (匹配), 100 (激进)
+     */
+    private BigDecimal calculateAggressivenessScore(String diagnosisTag) {
+        // 行为激进，得100分
+        if (TaggingConstants.LABEL_DIAGNOSIS_OVERWEIGHT.equals(diagnosisTag)) {
+            return new BigDecimal(100);
+        }
+        // 知行合一，得50分
+        if (TaggingConstants.LABEL_DIAGNOSIS_MATCH.equals(diagnosisTag)) {
+            return new BigDecimal(50);
+        }
+        // 行为保守或未知，都视为激进程度为0
+        return BigDecimal.ZERO;
+    }
+
+    // 【【【 这是新的、已修正的代码 】】】
+    private BigDecimal filterAndSum(List<CustomerHolding> holdings, Map<String, FundInfo> fundInfoMap, List<String> types) {
+        return holdings.stream()
+            .filter(h -> {
+                FundInfo info = fundInfoMap.get(h.getFundCode());
+                if (info == null || info.getFundType() == null || h.getMarketValue() == null) {
+                    return false;
+                }
+                // 核心修正：判断基金类型字符串是否“包含”我们定义的任一关键词
+                return types.stream().anyMatch(typeKeyword -> info.getFundType().contains(typeKeyword));
+            })
+            .map(CustomerHolding::getMarketValue)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private String buildBackUrl(String name, String idNumber, String tagName, String returnUrl) {
+        if (StringUtils.hasText(returnUrl)) return returnUrl;
+        StringBuilder url = new StringBuilder("/customer/list?from=details");
+        if (StringUtils.hasText(name)) url.append("&name=").append(name);
+        if (StringUtils.hasText(idNumber)) url.append("&idNumber=").append(idNumber);
+        if (StringUtils.hasText(tagName)) url.append("&tagName=").append(tagName);
         return url.toString();
     }
 }

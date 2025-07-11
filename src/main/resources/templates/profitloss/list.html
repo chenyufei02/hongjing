@@ -18,14 +18,17 @@
 
         <form th:action="@{/profitloss/list}" method="get" class="mb-4">
             <div class="row g-3 align-items-center">
-                <div class="col-md-3">
-                    <label>
-                        <input type="text" name="customerName" class="form-control" placeholder="输入客户姓名进行筛选..." th:value="${customerName}">
-                    </label>
+                <div class="col-md-auto">
+                    <label for="customerId" class="visually-hidden">按客户ID筛选</label>
+                    <input type="number" class="form-control" id="customerId" name="customerId" placeholder="输入客户ID..." th:value="${customerId}" style="width: 150px;">
                 </div>
-                <div class="col-md-9">
-                    <button type="submit" class="btn btn-primary me-2">查询</button>
-                    <a th:href="@{/profitloss/list}" class="btn btn-outline-secondary">重置</a>
+                <div class="col-md-auto">
+                    <label for="customerName" class="visually-hidden">按客户姓名筛选</label>
+                    <input type="text" class="form-control" id="customerName" name="customerName" placeholder="输入客户姓名..." th:value="${customerName}" style="width: 200px;">
+                </div>
+                <div class="col-md-auto">
+                    <button type="submit" class="btn btn-primary">查询</button>
+                    <a th:href="@{/profitloss/list}" class="btn btn-outline-secondary ms-2">重置</a>
                 </div>
             </div>
         </form>

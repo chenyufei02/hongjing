@@ -30,6 +30,9 @@
             <if test="customerName != null and customerName != ''">
                 c.name LIKE CONCAT('%', #{customerName}, '%')
             </if>
+            <if test="customerId != null">
+                AND c.id = #{customerId}
+            </if>
         </where>
         <if test="sortField != null and sortField != ''">
             ORDER BY ${sortField} ${sortOrder}
@@ -65,7 +68,7 @@
         LEFT JOIN (
             SELECT
                 customer_id,
-                SUM(CASE WHEN transaction_type = '申购' THEN transaction_amount ELSE 0 END) as total_investment
+                SUM(CASE WHEN transaction_type = '申购' THEN transaction_amount ELSE -transaction_amount END) as total_investment
             FROM fund_transaction
             WHERE customer_id = #{customerId}
             GROUP BY customer_id
