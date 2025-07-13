@@ -6,17 +6,25 @@ import org.apache.ibatis.annotations.Mapper;
 import com.whu.hongjing.pojo.vo.TagVO;
 import org.apache.ibatis.annotations.Select;
 import java.util.List;
+import org.apache.ibatis.annotations.Param;
 
 @Mapper
 public interface CustomerTagRelationMapper extends BaseMapper<CustomerTagRelation> {
 
-    /**
-     * 【修改】自定义SQL，增加tag_category的查询，并移除排序
-     */
-    @Select("SELECT tag_name as tagName, tag_category as tagCategory, COUNT(DISTINCT customer_id) as customerCount " +
-            "FROM customer_tag_relation " +
-            "GROUP BY tag_name, tag_category") // 按标签名和类别一同分组
+
     List<TagVO> selectTagStats();
+
+
+
+    /**
+     * 根据指定的客户ID列表，统计这些客户的标签分布情况
+     * @param customerIds 客户ID列表
+     * @return 包含标签名、类别和客户数的VO列表
+     */
+    List<TagVO> selectTagStatsByCustomerIds(@Param("customerIds") List<Long> customerIds);
+
+
+    List<Long> findCustomerIdsByTags(@Param("tagNames") List<String> tagNames, @Param("tagCount") int tagCount);
 
 
 }

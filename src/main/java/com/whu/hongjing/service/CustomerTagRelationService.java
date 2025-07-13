@@ -15,12 +15,19 @@ public interface CustomerTagRelationService extends IService<CustomerTagRelation
      */
     List<TagVO> getTagStats();
 
-     /**
-     * 【新增】根据一个或多个标签（按类别）找出同时拥有这些标签的客户ID集合
-     * @param tagsMap key为标签类别，value为标签名。只会处理value不为空的条目。
-     * @return 符合条件的客户ID集合
+
+
+
+    List<Long> findCustomerIdsByTags(List<String> tagNames);
+
+
+    /**
+     * 根据筛选条件，获取过滤后的标签统计数据
+     * @param filters 一个Map，key为标签类别，value为标签名
+     * @return 过滤后的标签统计VO列表
      */
-    Set<Long> findCustomerIdsByTags(Map<String, String> tagsMap);
+    List<TagVO> getFilteredTagStats(Map<String, String> filters);
+
 
 
 }

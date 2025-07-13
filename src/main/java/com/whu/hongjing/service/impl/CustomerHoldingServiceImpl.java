@@ -12,6 +12,7 @@ import com.whu.hongjing.pojo.vo.CustomerHoldingVO;
 import com.whu.hongjing.service.CustomerHoldingService;
 import com.whu.hongjing.service.CustomerService;
 import com.whu.hongjing.service.FundTransactionService;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -281,5 +282,43 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
         page.setTotal(holdingPage.getTotal());
         return page;
     }
+
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CustomerHoldingVO> getTopNHoldings(Long customerId, int limit) {
+        // 1. 构建查询，按市值降序，并限制数量
+        QueryWrapper<CustomerHolding> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("customer_id", customerId)
+                    .orderByDesc("market_value")
+                    .last("LIMIT " + limit);
+
+        List<CustomerHolding> topHoldings = this.list(queryWrapper);
+
+        if (topHoldings.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 2. 复用已有逻辑，批量获取关联的基金信息
+        List<String> fundCodes = topHoldings.stream().map(CustomerHolding::getFundCode).distinct().collect(Collectors.toList());
+        Map<String, String> fundCodeToNameMap = fundInfoService.listByIds(fundCodes).stream()
+                .collect(Collectors.toMap(FundInfo::getFundCode, FundInfo::getFundName));
+
+        // 我们只需要客户自己的名字，可以直接从第一个持仓记录中获取客户ID来查询
+        Customer customer = customerService.getById(topHoldings.get(0).getCustomerId());
+        String customerName = (customer != null) ? customer.getName() : "未知客户";
+
+        // 3. 组装VO列表
+        return topHoldings.stream().map(holding -> {
+            CustomerHoldingVO vo = new CustomerHoldingVO();
+            BeanUtils.copyProperties(holding, vo);
+            vo.setFundName(fundCodeToNameMap.get(holding.getFundCode()));
+            vo.setCustomerName(customerName); // 所有记录都用同一个客户名
+            return vo;
+        }).collect(Collectors.toList());
+    }
+
+
 
 }

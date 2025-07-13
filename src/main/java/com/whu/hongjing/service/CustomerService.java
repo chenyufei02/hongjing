@@ -28,12 +28,6 @@ public interface CustomerService extends IService<Customer>{
     Page<ProfitLossVO> getProfitLossPage(Page<ProfitLossVO> page, Long customerId,
                                          String customerName, String sortField, String sortOrder);
 
-    /**
-     * 【新增】根据多个标签名，找出同时拥有这些标签的所有客户ID
-     * @param tagNames 标签名称列表
-     * @return 符合条件的客户ID列表
-     */
-    List<Long> findCustomerIdsByTags(List<String> tagNames);
 
 
     // --- 【【【 新增方法声明 】】】 ---

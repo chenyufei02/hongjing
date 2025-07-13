@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.whu.hongjing.mapper.CustomerTagRelationMapper;
 import com.whu.hongjing.pojo.entity.CustomerTagRelation;
+import com.whu.hongjing.service.CustomerService;
 import com.whu.hongjing.service.CustomerTagRelationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.whu.hongjing.pojo.vo.TagVO;
 
@@ -16,6 +18,7 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class CustomerTagRelationServiceImpl extends ServiceImpl<CustomerTagRelationMapper, CustomerTagRelation> implements CustomerTagRelationService {
+
 
     @Override
     public List<TagVO> getTagStats() {
@@ -45,42 +48,37 @@ public class CustomerTagRelationServiceImpl extends ServiceImpl<CustomerTagRelat
     }
 
 
-    /**
-     * 【【【 新增的、支持多标签组合查询的核心方法 】】】
-     */
     @Override
-    public Set<Long> findCustomerIdsByTags(Map<String, String> tagsMap) {
-        // 过滤掉value为空的查询条件
-        Map<String, String> activeFilters = tagsMap.entrySet().stream()
-                .filter(entry -> StringUtils.hasText(entry.getValue()))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    public List<TagVO> getFilteredTagStats(Map<String, String> filters) {
+        // 1. 从前端传来的Map中，提取出所有非空的标签名，形成一个List
+        List<String> activeFilterTags = filters.values().stream()
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toList());
 
-        if (activeFilters.isEmpty()) {
-            return Collections.emptySet();
+        // 2. 如果没有任何有效的筛选条件，则返回全量统计数据
+        if (activeFilterTags.isEmpty()) {
+            return baseMapper.selectTagStats();
         }
 
-        // 构建一个动态的查询
-        QueryWrapper<CustomerTagRelation> queryWrapper = new QueryWrapper<>();
-        queryWrapper.select("customer_id");
+        // 3. 【核心修改】调用我们唯一的、标准的findCustomerIdsByTags方法
+        List<Long> customerIds = this.findCustomerIdsByTags(activeFilterTags);
 
-        // 使用OR条件来拼接所有有效的查询
-        queryWrapper.and(wrapper -> {
-            for (Map.Entry<String, String> filter : activeFilters.entrySet()) {
-                wrapper.or(orWrapper -> orWrapper
-                        .eq("tag_category", filter.getKey())
-                        .eq("tag_name", filter.getValue()));
-            }
-        });
+        // 4. 如果没有客户符合所有筛选条件，返回空列表
+        if (customerIds.isEmpty()) {
+            return Collections.emptyList();
+        }
 
-        // 核心逻辑：分组后，HAVING子句确保客户拥有所有我们正在筛选的标签
-        queryWrapper.groupBy("customer_id")
-                .having("COUNT(DISTINCT tag_category) = {0}", activeFilters.size());
-
-        List<CustomerTagRelation> relations = this.list(queryWrapper);
-
-        return relations.stream()
-                .map(CustomerTagRelation::getCustomerId)
-                .collect(Collectors.toSet());
+        // 5. 调用Mapper方法，只统计这些客户的标签分布
+        return baseMapper.selectTagStatsByCustomerIds(customerIds);
     }
 
+
+    // 【【【 3. 在这里，新增 findCustomerIdsByTags 方法的实现 】】】
+    public List<Long> findCustomerIdsByTags(List<String> tagNames) {
+        if (tagNames == null || tagNames.isEmpty()) {
+            return Collections.emptyList();
+        }
+        // 直接调用本类的Mapper方法
+        return baseMapper.findCustomerIdsByTags(tagNames, tagNames.size());
+    }
 }

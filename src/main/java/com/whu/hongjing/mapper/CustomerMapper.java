@@ -20,14 +20,14 @@ public interface CustomerMapper extends BaseMapper<Customer> {
             @Param("sortField") String sortField, @Param("sortOrder") String sortOrder);
 
 
-    /**
-     * 【【【 新增的方法声明 】】】
-     * @param tagNames 标签名称列表, 对应XML中的 "tagNames"
-     * @param tagCount 标签数量, 对应XML中的 "tagCount"
-     * @return 符合条件的客户ID列表
-     */
-    List<Long> findCustomerIdsByTags(
-            @Param("tagNames") List<String> tagNames, @Param("tagCount") int tagCount);
+//    /**
+//     * 【【【 新增的方法声明 】】】
+//     * @param tagNames 标签名称列表, 对应XML中的 "tagNames"
+//     * @param tagCount 标签数量, 对应XML中的 "tagCount"
+//     * @return 符合条件的客户ID列表
+//     */
+//    List<Long> findCustomerIdsByTags(
+//            @Param("tagNames") List<String> tagNames, @Param("tagCount") int tagCount);
 
 
     ProfitLossVO getProfitLossVOByCustomerId(@Param("customerId") Long customerId);

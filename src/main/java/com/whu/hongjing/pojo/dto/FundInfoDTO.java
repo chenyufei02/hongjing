@@ -5,6 +5,10 @@ import lombok.Data;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.Size;
 
+
+
+// 理论上 这个DTO类也不用出现 因为手动更新基金信息的方法也应该被删除，真实世界中不应该手动自己输入更新基金信息，
+// 而应该是从外部接口中获取
 @Data
 @Schema(description = "基金信息数据传输对象")
 public class FundInfoDTO {

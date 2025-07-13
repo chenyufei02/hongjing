@@ -67,12 +67,18 @@ public class RiskAssessmentServiceImpl extends ServiceImpl<RiskAssessmentMapper,
 
         // a. 如果有按“实盘风险”或“风险诊断”这两个标签的筛选条件
         if (StringUtils.hasText(actualRiskLevel) || StringUtils.hasText(riskDiagnosis)) {
-            customerIdsToFilter = customerTagRelationService.findCustomerIdsByTags(
-                    Map.of(
-                        TaggingConstants.CATEGORY_RISK_ACTUAL, actualRiskLevel,
-                        TaggingConstants.CATEGORY_RISK_DIAGNOSIS, riskDiagnosis
-                    )
-            );
+            // 1. 将有效的筛选条件（标签名）收集到一个List中
+            List<String> tagFilters = new ArrayList<>();
+            if (StringUtils.hasText(actualRiskLevel)) {
+                tagFilters.add(actualRiskLevel);
+            }
+            if (StringUtils.hasText(riskDiagnosis)) {
+                tagFilters.add(riskDiagnosis);
+            }
+
+            // 2. 调用我们唯一的、标准的、接收List的方法
+            customerIdsToFilter = new HashSet<>(customerTagRelationService.findCustomerIdsByTags(tagFilters));
+
             if (customerIdsToFilter.isEmpty()) {
                 page.setRecords(Collections.emptyList());
                 page.setTotal(0);

@@ -28,4 +28,5 @@ public class CustomerHoldingController {
     public boolean recalculateHoldings(@PathVariable Long customerId) {
         return customerHoldingService.recalculateAndSaveHoldings(customerId);
     }
+
 }

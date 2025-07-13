@@ -25,16 +25,16 @@ public class FundInfoController {
     @Autowired
     private FundDataImportService fundDataImportService; // 注入新的导入服务
 
-    @Operation(summary = "新增基金信息")
-    @PostMapping("/add")
-    public boolean addFundInfo(@RequestBody @Validated FundInfoDTO dto) {
-        FundInfo fundInfo = new FundInfo();
-        BeanUtils.copyProperties(dto, fundInfo);
-        return fundInfoService.save(fundInfo);
-    }
+//    @Operation(summary = "新增基金信息")
+//    @PostMapping("/add")
+//    public boolean addFundInfo(@RequestBody @Validated FundInfoDTO dto) {
+//        FundInfo fundInfo = new FundInfo();
+//        BeanUtils.copyProperties(dto, fundInfo);
+//        return fundInfoService.save(fundInfo);
+//    }
+//  【现实世界中似乎不应该有在自己的系统里手动增发一条基金的功能！】
 
-
-    // 现实中似乎不应该手动更新，应该全部来源于外部数据才对。 不应该提供手动更新的接口
+    // 【现实中似乎也不应该手动更新，应该全部来源于外部数据才对。 不应该提供手动更新的接口】
     @Operation(summary = "更新基金信息")
     @PutMapping("/update")
     public boolean updateFundInfo(@RequestBody @Validated FundInfoDTO dto) {
@@ -43,7 +43,7 @@ public class FundInfoController {
         return fundInfoService.updateById(fundInfo);
     }
 
-    // 现实中似乎不能手动删除 涉及到很多购买了的用户
+    // 【现实中似乎不能手动删除 涉及到很多购买了的用户 因此没有设计这个的前端接口】
     @Operation(summary = "根据基金代码删除基金信息")
     @DeleteMapping("/delete/{fundCode}")
     public boolean deleteFundInfo(@PathVariable String fundCode) {
@@ -61,7 +61,6 @@ public class FundInfoController {
     public List<FundInfo> listAllFundInfo() {
         return fundInfoService.list();
     }
-
 
 
     @PostMapping("/import-all")

@@ -42,19 +42,6 @@
         </if>
     </select>
 
-
-    <select id="findCustomerIdsByTags" resultType="long">
-        SELECT customer_id
-        FROM customer_tag_relation
-        WHERE tag_name IN
-        <foreach item="tagName" collection="tagNames" open="(" separator="," close=")">
-            #{tagName}
-        </foreach>
-        GROUP BY customer_id
-        HAVING COUNT(DISTINCT tag_name) = #{tagCount}
-    </select>
-
-
     <select id="getProfitLossVOByCustomerId" resultType="com.whu.hongjing.pojo.vo.ProfitLossVO">
         SELECT
             c.id as customerId,

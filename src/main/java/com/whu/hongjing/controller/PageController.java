@@ -139,6 +139,8 @@ public class PageController {
         // 3. 准备图表所需的数据
         prepareChartData(id, model);
         prepareHistoricalData(id, model);
+        // 4. 【新增】获取Top 10持仓列表
+        model.addAttribute("topHoldings", customerHoldingService.getTopNHoldings(id, 10));
 
         return "customer/detail";
     }
@@ -194,15 +196,6 @@ public class PageController {
         return "fund/list";
     }
 
-    /**
-     * 显示新增基金的表单页面
-     */
-    @GetMapping("/fund/add")
-    public String showAddFundForm(Model model) {
-        model.addAttribute("fundInfoDTO", new FundInfoDTO());
-        model.addAttribute("activeUri", "/fund/list");
-        return "fund/add";
-    }
 
     /**
      * 显示客户持仓列表页面
@@ -362,6 +355,17 @@ public class PageController {
         model.addAttribute("reversedSortOrder", "asc".equals(sortOrder) ? "desc" : "asc");
         return "profitloss/list";
     }
+
+
+
+
+
+
+
+
+
+
+
 
     // ========== 私有辅助方法 (Private Helper Methods) ==========
 
@@ -591,4 +595,7 @@ public class PageController {
         if (StringUtils.hasText(tagName)) url.append("&tagName=").append(tagName);
         return url.toString();
     }
+
+
+
 }

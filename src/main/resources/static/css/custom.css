@@ -209,3 +209,22 @@ body {
 
 
 
+/* --- 【【【 新增：针对客户详情页的响应式微调 】】】 --- */
+
+/* 缩小卡片内所有基础信息文字的字号 */
+.detail-card .card-body .row > div {
+    font-size: 0.9rem; /* 将字号从默认的1rem缩小一点 */
+}
+
+/* 缩小标签组标题的字号和间距 */
+.detail-card .tag-group-title {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem; /* 减小标题和下方标签的距离 */
+}
+
+/* 让标签本身也变得更“瘦”，减小内外边距 */
+.detail-card .tag-badge {
+    padding: 0.35em 0.6em; /* 减小内边距 */
+    margin: 2px 4px 2px 0; /* 减小外边距 */
+    font-size: 0.8rem; /* 减小标签字号 */
+}

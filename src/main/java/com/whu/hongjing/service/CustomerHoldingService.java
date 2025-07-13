@@ -31,4 +31,17 @@ public interface CustomerHoldingService extends IService<CustomerHolding> {
             String fundCode, String sortField, String sortOrder);
 
 
+    /**
+     * 获取单个客户市值排名前N的持仓详情
+     * @param customerId 客户ID
+     * @param limit 要获取的记录数
+     * @return 包含持仓视图对象(VO)的列表
+     */
+    List<CustomerHoldingVO> getTopNHoldings(Long customerId, int limit);
+
+
+
+
+
+
 }

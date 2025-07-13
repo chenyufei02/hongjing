@@ -96,7 +96,7 @@
                         <td th:text="${#numbers.formatDecimal(transaction.sharePrice, 1, 4)}"></td>
                         <td th:text="${#temporals.format(transaction.transactionTime, 'yyyy-MM-dd HH:mm')}"></td>
                         <td th:text="${transaction.status}"></td>
-                        <td><a class="btn btn-sm btn-outline-primary" th:href="@{/customer/detail/{id}(id=${transaction.customerId}, returnUrl=${#request.getRequestURI() + '?' + #request.getQueryString()})}">查看详情</a>
+                        <td><a class="btn btn-sm btn-outline-primary" th:href="@{/customer/detail/{id}(id=${transaction.customerId}, returnUrl=${#request.getRequestURI() + '?' + #request.getQueryString()})}">客户详情</a>
                         </td>
                     </tr>
                     <tr th:if="${#lists.isEmpty(transactionPage.records)}">

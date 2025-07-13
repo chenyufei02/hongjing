@@ -4,9 +4,7 @@
     <th:block th:replace="~{layout :: common_head('可视化画像', ~{})}" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .chart-card {
-            min-height: 380px;
-        }
+        .chart-card { min-height: 380px; }
     </style>
 </head>
 <body>
@@ -16,18 +14,13 @@
 
 <div class="main-content">
     <div class="container-fluid">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="h4">统计图表</h2>
-        </div>
+        <h2 class="h4 mb-4">统计仪表盘</h2>
 
         <div class="card mb-4">
-            <div class="card-header fw-bold">
-                全局筛选器
-            </div>
+            <div class="card-header fw-bold">全局筛选器</div>
             <div class="card-body">
-                <p class="card-text text-muted">请在下方选择一个或多个标签，然后点击“应用筛选”按钮，下方所有图表都将根据您选择的客户群体进行更新。</p>
-                <div id="filter-form-container" class="row g-3">
-                    </div>
+                <p class="card-text text-muted">请选择一个或多个标签，然后点击“应用筛选”按钮，下方所有内容都将根据您选择的客户群体进行更新。</p>
+                <div id="filter-form-container" class="row g-3"></div>
                 <hr>
                 <div class="d-flex justify-content-end align-items-center">
                      <button id="reset-filters-btn" class="btn btn-outline-secondary me-2">重置筛选</button>
@@ -36,41 +29,54 @@
             </div>
         </div>
 
+        <div id="dashboard-container">
+            <div id="chart-grid-container" class="row g-4"></div>
+            <div id="full-width-chart-container" class="row g-4 mt-0"></div>
+        </div>
 
-        <div id="dashboard-container" class="row g-4">
-            <div id="loading-indicator" class="text-center p-5">
-                <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
-                <p class="mt-2">正在加载图表数据...</p>
-            </div>
+        <div id="loading-indicator" class="text-center p-5">
+            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+            <p class="mt-2">正在加载图表数据...</p>
+        </div>
+
+        <div id="customer-list-container" class="card mt-4" style="display: none;">
+            <div class="card-header fw-bold"><i class="bi bi-people-fill me-2"></i>筛选结果客户列表</div>
+            <div class="card-body p-0" id="customer-list-body"></div>
+            <div class="card-footer d-flex justify-content-center" id="customer-list-pagination"></div>
         </div>
     </div>
 </div>
 
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // --- 1. 获取所有需要操作的HTML元素 ---
     const dashboardContainer = document.getElementById('dashboard-container');
     const loadingIndicator = document.getElementById('loading-indicator');
     const filterFormContainer = document.getElementById('filter-form-container');
     const applyFiltersBtn = document.getElementById('apply-filters-btn');
     const resetFiltersBtn = document.getElementById('reset-filters-btn');
+    const customerListContainer = document.getElementById('customer-list-container');
+    const customerListBody = document.getElementById('customer-list-body');
+    const customerListPagination = document.getElementById('customer-list-pagination');
 
-    let allChartInstances = []; // 用来存放所有图表实例，方便后续更新或销毁
-    let originalData = {}; // 用来缓存从后端获取的原始数据
+    let allChartInstances = [];
+    let currentFilters = {}; // 用于存储当前的筛选条件，方便翻页
+    let originalData = {}; // 用于缓存原始全量数据
 
-    // --- 核心函数：根据数据绘制所有图表 ---
+    // --- 2. 核心函数：根据数据绘制所有图表 ---
     function renderDashboard(statsData) {
-        // 清空旧的图表和实例
         dashboardContainer.innerHTML = '';
         allChartInstances.forEach(chart => chart.destroy());
         allChartInstances = [];
-
+        if (!statsData || Object.keys(statsData).every(key => !statsData[key] || statsData[key].length === 0)) {
+            dashboardContainer.innerHTML = '<div class="col-12 text-center py-5"><p class="text-muted">没有找到符合筛选条件的客户群体统计数据。</p></div>';
+            return;
+        }
         for (const category in statsData) {
             if (statsData.hasOwnProperty(category) && statsData[category].length > 0) {
                 const data = statsData[category];
                 const chartWrapper = document.createElement('div');
                 chartWrapper.className = (category === '职业') ? 'col-12' : 'col-lg-4 col-md-6';
-
                 const card = document.createElement('div');
                 card.className = 'card chart-card mb-4';
                 const cardBody = document.createElement('div');
@@ -80,45 +86,159 @@ document.addEventListener('DOMContentLoaded', function() {
                 card.appendChild(cardBody);
                 chartWrapper.appendChild(card);
                 dashboardContainer.appendChild(chartWrapper);
-
                 const config = getChartConfig(category, data);
                 allChartInstances.push(new Chart(canvas, config));
             }
         }
     }
 
-    // --- 核心函数：生成图表配置 ---
+    // --- 3. 核心函数：生成图表配置 ---
     function getChartConfig(category, data) {
         const labels = data.map(item => item.tagName);
         const counts = data.map(item => item.customerCount);
-        const colors = ['rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)', 'rgba(255, 206, 86, 0.7)', 'rgba(75, 192, 192, 0.7)', 'rgba(153, 102, 255, 0.7)', 'rgba(255, 159, 64, 0.7)'];
+        const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'];
         let chartType = 'pie';
-        let chartOptions = {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { position: 'top' }, title: { display: true, text: category, font: { size: 16 } } }
-        };
+        let chartOptions = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: true, text: category, font: { size: 16 } } } };
         if (category === '职业') { chartType = 'bar'; chartOptions.indexAxis = 'y'; }
-        return {
-            type: chartType,
-            data: {
-                labels: labels,
-                datasets: [{ label: '客户数量', data: counts, backgroundColor: colors, borderWidth: 1 }]
-            },
-            options: chartOptions
-        };
+        return { type: chartType, data: { labels: labels, datasets: [{ label: '客户数量', data: counts, backgroundColor: colors, borderWidth: 1 }] }, options: chartOptions };
     }
 
-    // --- 页面初始化：获取数据并渲染 ---
+    /**
+     * 【完整的函数】：渲染客户列表和分页控件
+     */
+    function renderCustomerList(customerPage) {
+        customerListBody.innerHTML = '';
+        customerListPagination.innerHTML = '';
+
+        if (!customerPage || customerPage.total === 0) {
+            customerListContainer.style.display = 'none';
+            return;
+        }
+
+        const table = document.createElement('table');
+        table.className = 'table table-hover align-middle';
+        table.innerHTML = `
+            <thead class="table-light">
+                <tr>
+                    <th class="ps-4">客户ID</th>
+                    <th>姓名</th>
+                    <th>性别</th>
+                    <th>职业</th>
+                    <th class="text-center">操作</th>
+                </tr>
+            </thead>`;
+        const tbody = document.createElement('tbody');
+        customerPage.records.forEach(customer => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="ps-4">${customer.id}</td>
+                <td>${customer.name}</td>
+                <td>${customer.gender || 'N/A'}</td>
+                <td>${customer.occupation || 'N/A'}</td>
+                <td class="text-center">
+                    <a class="btn btn-sm btn-outline-primary" href="/customer/detail/${customer.id}?returnUrl=/visualization/dashboard">查看详情</a>
+                </td>`;
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        customerListBody.appendChild(table);
+
+        if (customerPage.pages > 1) {
+            const nav = document.createElement('nav');
+            const ul = document.createElement('ul');
+            ul.className = 'pagination mb-0';
+
+            const createPageItem = (pageNum, text, isDisabled = false, isActive = false) => {
+                const li = document.createElement('li');
+                li.className = `page-item ${isDisabled ? 'disabled' : ''} ${isActive ? 'active' : ''}`;
+                const a = document.createElement('a');
+                a.className = 'page-link';
+                a.href = '#';
+                a.innerHTML = text;
+                if (!isDisabled) {
+                    a.addEventListener('click', (e) => { e.preventDefault(); applyFilters(pageNum); });
+                }
+                li.appendChild(a);
+                return li;
+            };
+
+            let startPage = Math.max(1, customerPage.current - 2);
+            let endPage = Math.min(customerPage.pages, startPage + 4);
+            if (endPage - startPage < 4) { startPage = Math.max(1, endPage - 4); }
+
+            ul.appendChild(createPageItem(customerPage.current - 1, '&laquo;', customerPage.current === 1));
+            for (let i = startPage; i <= endPage; i++) {
+                ul.appendChild(createPageItem(i, i, false, i === customerPage.current));
+            }
+            ul.appendChild(createPageItem(customerPage.current + 1, '&raquo;', customerPage.current === customerPage.pages));
+
+            nav.appendChild(ul);
+            customerListPagination.appendChild(nav);
+        }
+
+        const jumpContainer = document.createElement('div');
+        jumpContainer.className = 'ms-3 d-flex align-items-center';
+        jumpContainer.style.fontSize = '0.9rem';
+        jumpContainer.innerHTML = `
+            <span class="ms-2 text-nowrap">共 ${customerPage.pages} 页, 到第</span>
+            <input type="number" class="form-control form-control-sm mx-1" style="width: 60px;" id="page-jump-input">
+            <span class="me-1">页</span>
+            <button class="btn btn-sm btn-primary ms-1" type="button" id="page-jump-button">确定</button>`;
+        customerListPagination.appendChild(jumpContainer);
+
+        document.getElementById('page-jump-button').addEventListener('click', function() {
+            const input = document.getElementById('page-jump-input');
+            const pageNum = parseInt(input.value, 10);
+            if (isNaN(pageNum) || pageNum < 1 || pageNum > customerPage.pages) {
+                alert(`请输入一个有效的页码 (1 - ${customerPage.pages})`);
+                return;
+            }
+            applyFilters(pageNum);
+        });
+
+        customerListContainer.style.display = 'block';
+    }
+
+    /**
+     * 【完整的函数】：执行筛选，现在支持分页
+     */
+    function applyFilters(pageNum = 1, pageSize = 10) { // 默认每页10条
+        loadingIndicator.style.display = 'block';
+        dashboardContainer.innerHTML = '';
+        customerListContainer.style.display = 'none';
+
+        if (pageNum === 1) {
+            currentFilters = {};
+            document.querySelectorAll('.filter-select').forEach(select => {
+                if (select.value) { currentFilters[select.dataset.category] = select.value; }
+            });
+        }
+
+        const payload = { filters: currentFilters, page: pageNum, size: pageSize };
+
+        fetch('/api/dashboard/filtered-stats', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(result => {
+            loadingIndicator.style.display = 'none';
+            renderDashboard(result.chartData);
+            renderCustomerList(result.customerPage);
+        })
+        .catch(error => { console.error('筛选时发生错误:', error); loadingIndicator.innerHTML = '<p class="text-danger">数据加载失败！</p>'; });
+    }
+
+    // --- 页面初始化逻辑 ---
     fetch('/api/dashboard/all-stats')
         .then(response => response.json())
         .then(stats => {
-            loadingIndicator.remove();
-            originalData = stats; // 缓存原始数据
-            renderDashboard(originalData); // 首次渲染
-
-            // --- 根据获取的数据，动态生成筛选下拉框 ---
-            for (const category in originalData) {
-                 if (originalData.hasOwnProperty(category) && originalData[category].length > 0) {
+            loadingIndicator.style.display = 'none';
+            originalData = stats;
+            renderDashboard(originalData);
+            for (const category in stats) {
+                if (stats.hasOwnProperty(category)) {
                     const col = document.createElement('div');
                     col.className = 'col-md-3';
                     const select = document.createElement('select');
@@ -128,7 +248,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     defaultOption.value = '';
                     defaultOption.textContent = '筛选 ' + category + '...';
                     select.appendChild(defaultOption);
-                    originalData[category].forEach(tag => {
+                    stats[category].forEach(tag => {
                         const option = document.createElement('option');
                         option.value = tag.tagName;
                         option.textContent = tag.tagName;
@@ -136,27 +256,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     col.appendChild(select);
                     filterFormContainer.appendChild(col);
-                 }
+                }
             }
         })
-        .catch(error => {
-            console.error('加载仪表盘数据时发生错误:', error);
-            loadingIndicator.innerHTML = '<p class="text-danger">数据加载失败！</p>';
-        });
+        .catch(error => { console.error('加载仪表盘时发生错误:', error); });
 
-    // --- 筛选按钮逻辑 ---
-    applyFiltersBtn.addEventListener('click', function() {
-        // 在这里，我们需要一个新的后端API来处理筛选逻辑
-        // 作为一个临时方案，我们可以在前端模拟筛选，但这在真实场景中不准确
-        // 这是一个更高级的功能，需要我们后续再专门开发后端API
-        alert('“应用筛选”功能需要专门的后端API支持，我们将在下一个版本中实现这个高级功能！现在，您可以先浏览完整的画像数据。');
-    });
-
-    // --- 重置按钮逻辑 ---
+    // --- 绑定按钮事件 ---
+    applyFiltersBtn.addEventListener('click', () => applyFilters(1));
     resetFiltersBtn.addEventListener('click', function() {
         document.querySelectorAll('.filter-select').forEach(select => select.value = '');
-        // 重置时可以重新渲染原始图表
+        currentFilters = {};
         renderDashboard(originalData);
+        customerListContainer.style.display = 'none';
     });
 });
 </script>

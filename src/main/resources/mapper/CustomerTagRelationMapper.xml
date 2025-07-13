@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.whu.hongjing.mapper.CustomerTagRelationMapper">
+
+    <select id="selectTagStats" resultType="com.whu.hongjing.pojo.vo.TagVO">
+        SELECT tag_name as tagName, tag_category as tagCategory, COUNT(DISTINCT customer_id) as customerCount
+        FROM customer_tag_relation
+        GROUP BY tag_name, tag_category
+    </select>
+
+    <select id="selectTagStatsByCustomerIds" resultType="com.whu.hongjing.pojo.vo.TagVO">
+        SELECT
+            tag_name as tagName,
+            tag_category as tagCategory,
+            COUNT(DISTINCT customer_id) as customerCount
+        FROM
+            customer_tag_relation
+        <where>
+            <if test="customerIds != null and !customerIds.isEmpty()">
+                customer_id IN
+                <foreach item="item" collection="customerIds" open="(" separator="," close=")">
+                    #{item}
+                </foreach>
+            </if>
+        </where>
+        GROUP BY
+            tag_name, tag_category
+    </select>
+
+    <select id="findCustomerIdsByTags" resultType="long">
+        SELECT customer_id
+        FROM customer_tag_relation
+        WHERE tag_name IN
+        <foreach item="tagName" collection="tagNames" open="(" separator="," close=")">
+            #{tagName}
+        </foreach>
+        GROUP BY customer_id
+        HAVING COUNT(DISTINCT tag_name) = #{tagCount}
+    </select>
+
+</mapper>

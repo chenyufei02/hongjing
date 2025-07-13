@@ -44,8 +44,8 @@
         </div>
 
         <div class="row">
-            <div class="col-lg-5 mb-4">
-                <div class="card h-100">
+            <div class="col-12 col-lg-5 mb-4">
+                <div class="card h-100 detail-card">
                     <div class="card-header fw-bold"><i class="bi bi-person-lines-fill me-2"></i>基础信息</div>
                     <div class="card-body">
                         <div class="row" th:object="${customer}">
@@ -61,10 +61,14 @@
                     </div>
                 </div>
             </div>
-            <div class="col-lg-7 mb-4">
-                <div class="card h-100">
+
+            <div class="col-12 col-lg-7 mb-4">
+                <div class="card h-100 detail-card">
                     <div class="card-header fw-bold d-flex justify-content-between align-items-center">
                         <span><i class="bi bi-tags-fill me-2"></i>画像标签云</span>
+                        <button class="btn btn-success btn-sm me-2" id="ai-suggestion-btn" th:data-customer-id="${customer.id}">
+                            <i class="bi bi-robot"></i> 生成营销建议
+                        </button>
                         <button class="btn btn-warning btn-sm" id="refresh-single-tag-btn" th:data-customer-id="${customer.id}">
                             <i class="bi bi-arrow-clockwise"></i> 刷新标签
                         </button>
@@ -145,6 +149,54 @@
                 </div>
             </div>
         </div>
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-card-list me-2"></i>持仓详情 (按市值Top 10)</span>
+                        <a class="btn btn-outline-primary btn-sm"
+                           th:href="@{/holding/list(customerName=${customer.name})}">
+                           查看全部
+                        </a>
+                    </div>
+                    <div class="card-body p-0">
+                        <div th:if="${#lists.isEmpty(topHoldings)}" class="text-muted text-center p-5">
+                            <p>该客户暂无持仓记录。</p>
+                        </div>
+                        <div th:unless="${#lists.isEmpty(topHoldings)}" class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th class="ps-4">基金名称</th>
+                                        <th class="text-end">持有份额</th>
+                                        <th class="text-end">平均成本</th>
+                                        <th class="text-end">当前市值</th>
+                                        <th class="text-end pe-4">持仓盈亏</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr th:each="holding : ${topHoldings}">
+                                        <td class="ps-4">
+                                            <div th:text="${holding.fundName}">基金名称</div>
+                                            <small class="text-muted" th:text="${holding.fundCode}"></small>
+                                        </td>
+                                        <td class="text-end" th:text="${#numbers.formatDecimal(holding.totalShares, 1, 'COMMA', 2, 'POINT')}"></td>
+                                        <td class="text-end" th:text="${#numbers.formatDecimal(holding.averageCost, 1, 4, 'POINT')}"></td>
+                                        <td class="text-end fw-bold" th:text="${#numbers.formatDecimal(holding.marketValue, 1, 'COMMA', 2, 'POINT')}"></td>
+                                        <td class="text-end pe-4">
+                                            <span th:with="pl=${holding.marketValue - (holding.totalShares * holding.averageCost)}"
+                                                  th:text="${(pl >= 0 ? '+' : '') + #numbers.formatDecimal(pl, 1, 'COMMA', 2, 'POINT')}"
+                                                  th:class="${pl >= 0 ? 'text-profit' : 'text-loss'}">
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -204,6 +256,43 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
             });
         }
+    }
+
+    // --- 【最终版】AI建议按钮逻辑，使用模态框 ---
+    const aiBtn = document.getElementById('ai-suggestion-btn');
+    if (aiBtn) {
+        const aiModalElement = document.getElementById('aiSuggestionModal');
+        const aiModal = new bootstrap.Modal(aiModalElement);
+        const aiModalBody = document.getElementById('aiSuggestionBody');
+
+        aiBtn.addEventListener('click', function() {
+            const customerId = this.dataset.customerId;
+            const originalText = this.innerHTML;
+
+            aiBtn.disabled = true;
+            aiBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> AI正在思考...';
+
+            // 先清空上一次的内容
+            aiModalBody.textContent = '正在为您生成专属营销建议，请稍候...';
+
+            fetch('/api/ai/suggestion/' + customerId, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        aiModalBody.textContent = data.data;
+                        aiModal.show(); // 显示模态框
+                    } else {
+                        throw new Error(data.message);
+                    }
+                })
+                .catch(error => {
+                    alert('生成建议失败：' + error.message);
+                })
+                .finally(() => {
+                    aiBtn.disabled = false;
+                    aiBtn.innerHTML = originalText;
+                });
+        });
     }
 
     // 图表渲染逻辑
@@ -392,5 +481,25 @@ document.addEventListener('DOMContentLoaded', function() {
 /* ]]> */
 </script>
 
+
+<div class="modal fade" id="aiSuggestionModal" tabindex="-1" aria-labelledby="aiModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="aiModalLabel"><i class="bi bi-robot me-2"></i>AI营销建议</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="aiSuggestionBody" style="white-space: pre-wrap; line-height: 1.8;">
+        </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
+
+
+
 </html>

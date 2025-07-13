@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.util.StringUtils;
@@ -78,7 +77,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
         if (StringUtils.hasText(tagName)) {
             // 将单个tagName转换为列表，调用我们新的多标签查询方法
             List<String> tagList = Arrays.asList(tagName.split(","));
-            List<Long> customerIds = this.findCustomerIdsByTags(tagList);
+            List<Long> customerIds = customerTagRelationService.findCustomerIdsByTags(tagList);
 
             if (customerIds.isEmpty()) {
                 // 如果根据标签没有找到任何客户，直接返回空结果，避免无效查询
@@ -132,16 +131,6 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     public Page<ProfitLossVO> getProfitLossPage(Page<ProfitLossVO> page, Long customerId, String customerName, String sortField, String sortOrder) {
         // 【已更新】将 customerId 参数传递给Mapper层
         return baseMapper.getProfitLossPage(page, customerId, customerName, sortField, sortOrder);
-    }
-
-
-    @Override
-    public List<Long> findCustomerIdsByTags(List<String> tagNames) {
-        if (tagNames == null || tagNames.isEmpty()) {
-            return Collections.emptyList();
-        }
-        // 直接调用Mapper中的高级SQL
-        return baseMapper.findCustomerIdsByTags(tagNames, tagNames.size());
     }
 
 
