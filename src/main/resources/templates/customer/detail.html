@@ -66,9 +66,6 @@
                 <div class="card h-100 detail-card">
                     <div class="card-header fw-bold d-flex justify-content-between align-items-center">
                         <span><i class="bi bi-tags-fill me-2"></i>画像标签云</span>
-                        <button class="btn btn-success btn-sm me-2" id="ai-suggestion-btn" th:data-customer-id="${customer.id}">
-                            <i class="bi bi-robot"></i> AI生成营销建议
-                        </button>
                         <button class="btn btn-warning btn-sm" id="refresh-single-tag-btn" th:data-customer-id="${customer.id}">
                             <i class="bi bi-arrow-clockwise"></i> 刷新标签
                         </button>
@@ -127,28 +124,7 @@
             </div>
         </div>
 
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header fw-bold"><i class="bi bi-graph-up me-2"></i>历史走势分析</div>
-                    <div class="card-body p-4">
-                        <div th:if="${historicalDataJson == '{}'}" class="text-muted text-center py-5">
-                            <p>客户暂无交易记录，无法生成历史走势图。</p>
-                        </div>
-                        <div th:unless="${historicalDataJson == '{}'}" class="row">
-                            <div class="col-lg-7 border-end">
-                                <h6 class="text-center text-muted mb-3">资产与投入走势对比 (近似值)</h6>
-                                <div style="height: 320px;"><canvas id="historicalAssetChart"></canvas></div>
-                            </div>
-                            <div class="col-lg-5">
-                                <h6 class="text-center text-muted mb-3">月度资金净流</h6>
-                                <div style="height: 320px;"><canvas id="monthlyFlowChart"></canvas></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+
         <div class="row mt-4">
             <div class="col-12">
                 <div class="card">

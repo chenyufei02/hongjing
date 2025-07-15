@@ -346,17 +346,6 @@ public class PageController {
     }
 
 
-// ===================================统计仪表盘===================================
-    /**
-     * 显示统计仪表盘页面
-     */
-    @GetMapping("/visualization/dashboard")
-    public String showDashboard(Model model)
-    {
-        model.addAttribute("activeUri", "/visualization/dashboard");
-        return "visualization/dashboard";
-    }
-
 
 // ===================================补充：客户管理【详情页】===================================
     /**
@@ -393,7 +382,7 @@ public class PageController {
 
         // 3. 准备图表所需的数据
         prepareChartData(id, model);  // 投资分析图表
-        prepareHistoricalData(id, model);  // 历史走势图表
+
 
         // 4. 获取Top 10持仓列表
         model.addAttribute("topHoldings", customerHoldingService.getTopNHoldings(id, 10));
@@ -457,86 +446,6 @@ public class PageController {
         } catch (JsonProcessingException e) {
             e.printStackTrace();
             setEmptyChartData(model);
-        }
-    }
-
-    /**
-     * 【 为历史走势双曲线图和资金流图准备数据 】
-     */
-    private void prepareHistoricalData(Long customerId, Model model) {
-        List<FundTransaction> transactions = fundTransactionService.list(
-            new QueryWrapper<FundTransaction>().eq("customer_id", customerId).orderByAsc("transaction_time")
-        );
-
-        if (transactions == null || transactions.isEmpty()) {
-            model.addAttribute("historicalDataJson", "{}");
-            model.addAttribute("monthlyFlowJson", "{}");
-            return;
-        }
-
-        // --- 计算1：双曲线图（资产总额 vs 累计净投入） ---
-        Map<String, Map<String, BigDecimal>> historicalData = new LinkedHashMap<>();
-        BigDecimal cumulativeInvestment = BigDecimal.ZERO;
-        Map<String, BigDecimal> currentShares = new HashMap<>();
-
-        for (FundTransaction tx : transactions) {
-            String date = tx.getTransactionTime().toLocalDate().toString();
-            String fundCode = tx.getFundCode();
-
-            // 更新累计净投入 (现金流口径)
-            if ("申购".equals(tx.getTransactionType())) {
-                cumulativeInvestment = cumulativeInvestment.add(tx.getTransactionAmount());
-            } else {
-                cumulativeInvestment = cumulativeInvestment.subtract(tx.getTransactionAmount());
-            }
-
-            // 更新份额
-            BigDecimal shares = currentShares.getOrDefault(fundCode, BigDecimal.ZERO);
-            if ("申购".equals(tx.getTransactionType())) {
-                currentShares.put(fundCode, shares.add(tx.getTransactionShares()));
-            } else {
-                currentShares.put(fundCode, shares.subtract(tx.getTransactionShares()));
-            }
-
-            // 使用【所有】基金的【当前】份额 和 【当天】的成交价来估算总市值
-            BigDecimal totalMarketValue = BigDecimal.ZERO;
-            for(Map.Entry<String, BigDecimal> entry : currentShares.entrySet()) {
-                // 这里用当天交易的基金净值，去估算所有持仓的市值，是简化方案A的核心
-                totalMarketValue = totalMarketValue.add(
-                    entry.getValue().multiply(tx.getSharePrice() != null ? tx.getSharePrice() : BigDecimal.ONE)
-                );
-            }
-
-            Map<String, BigDecimal> dailyData = new HashMap<>();
-            dailyData.put("assets", totalMarketValue.setScale(2, RoundingMode.HALF_UP));
-            dailyData.put("investment", cumulativeInvestment.setScale(2, RoundingMode.HALF_UP));
-            historicalData.put(date, dailyData);
-        }
-
-        // --- 计算2：月度资金净流入/流出 ---
-        Map<String, BigDecimal> monthlyFlowData = transactions.stream()
-            .collect(Collectors.groupingBy(
-                tx -> tx.getTransactionTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM")),
-                Collectors.mapping(
-                    tx -> "申购".equals(tx.getTransactionType()) ? tx.getTransactionAmount() : tx.getTransactionAmount().negate(),
-                    Collectors.reducing(BigDecimal.ZERO, BigDecimal::add)
-                )
-            ));
-
-        // 按月份排序
-        Map<String, BigDecimal> sortedMonthlyFlow = new LinkedHashMap<>();
-        monthlyFlowData.entrySet().stream()
-            .sorted(Map.Entry.comparingByKey())
-            .forEachOrdered(e -> sortedMonthlyFlow.put(e.getKey(), e.getValue()));
-
-        // --- 将数据转换为JSON ---
-        try {
-            model.addAttribute("historicalDataJson", objectMapper.writeValueAsString(historicalData));
-            model.addAttribute("monthlyFlowJson", objectMapper.writeValueAsString(sortedMonthlyFlow));
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
-            model.addAttribute("historicalDataJson", "{}");
-            model.addAttribute("monthlyFlowJson", "{}");
         }
     }
 
