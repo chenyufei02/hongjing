@@ -1,7 +1,7 @@
 package com.whu.hongjing.controller;
 
 import com.whu.hongjing.pojo.vo.ApiResponseVO; // <-- 1. 导入我们新的VO类
-import com.whu.hongjing.service.TagRefreshService;
+import com.whu.hongjing.service.TagService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,14 +14,14 @@ import org.springframework.web.bind.annotation.*;
 public class TagController {
 
     @Autowired
-    private TagRefreshService tagRefreshService;
+    private TagService tagService;
 
     // 【未提供单独刷新一个的前端实现】
     @PostMapping("/refresh/{customerId}")
     @Operation(summary = "【手动触发】刷新指定客户的所有标签")
     public ApiResponseVO refreshCustomerTags(@PathVariable Long customerId) { // <-- 2. 修改返回类型为 ApiResponseVO
         try {
-            tagRefreshService.refreshTagsForCustomer(customerId);
+            tagService.refreshTagsForCustomer(customerId);
             // 3. 返回一个结构清晰的 ApiResponseVO 对象
             return new ApiResponseVO(true, "客户 " + customerId + " 的标签刷新任务已成功触发并执行完毕！");
         } catch (Exception e) {
@@ -38,7 +38,7 @@ public class TagController {
     public ApiResponseVO refreshAllCustomerTags() {
         try {
             // 直接调用我们的异步批量服务
-            tagRefreshService.refreshAllTagsAtomically();
+            tagService.refreshAllTagsAtomically();
             // 立即返回成功响应，告知前端任务已启动
             return new ApiResponseVO(true, "全量标签刷新任务已成功执行完毕！");
         } catch (Exception e) {

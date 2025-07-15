@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 @Component
 public class TagRefreshWorker {
 
-    // 1. 把原来 TagRefreshServiceImpl 的所有依赖都复制到这里
+    // 1. 把原来 TagServiceImpl 的所有依赖都复制到这里
     @Autowired private CustomerHoldingService customerHoldingService;
     @Autowired private FundTransactionService fundTransactionService;
     @Autowired private CustomerProfileService customerProfileService;
@@ -62,7 +62,7 @@ public class TagRefreshWorker {
         }
     }
 
-    // --- 以下是所有从 TagRefreshServiceImpl 中“搬家”过来的私有辅助方法，代码和注释都保持原样 ---
+    // --- 以下是所有从 TagServiceImpl 中“搬家”过来的私有辅助方法，代码和注释都保持原样 ---
 
     /**
      * 负责计算并保存一个客户的所有核心“量化”数据到 customer_profile 表。

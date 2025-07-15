@@ -1,6 +1,6 @@
 package com.whu.hongjing.service;
 
-public interface TagRefreshService {
+public interface TagService {
 
     /**
      * 【核心方法】为单个客户刷新所有画像数据（指标+标签）。

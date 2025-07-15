@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 
 /**
  * 后台定时任务服务
- * V3 最终性能版：采用手动管理的线程池实现“计算并行+写入并行+自动重试”模型。
+ * 采用线程池实现“计算并行+写入并行+自动重试”模型。
  */
 @Service
 public class ScheduledTasksService {
@@ -28,15 +28,13 @@ public class ScheduledTasksService {
     private FundInfoService fundInfoService;
     @Autowired
     private CustomerHoldingService customerHoldingService;
-
-    // 【新增】注入我们新的事务写入服务
     @Autowired
     private DailyUpdateWriterService dailyUpdateWriterService;
 
     /**
      * 总调度方法，自身不带事务。负责协调两个并发的更新阶段。
      */
-    @Scheduled(cron = "0 09 17 * * ?")
+    @Scheduled(cron = "0 10 15 * * ?")
     public void updateNetValueAndMarketValueDaily() {
         System.out.println("【定时任务】开始执行每日净值与市值更新...");
 

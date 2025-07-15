@@ -19,6 +19,7 @@ import org.springframework.util.StringUtils;
 @Service
 public class CustomerTagRelationServiceImpl extends ServiceImpl<CustomerTagRelationMapper, CustomerTagRelation> implements CustomerTagRelationService {
 
+    // 【 所有根据多个标签查询客户列表的总后端实现 ！！】
 
     @Override
     public List<TagVO> getTagStats() {
@@ -48,32 +49,7 @@ public class CustomerTagRelationServiceImpl extends ServiceImpl<CustomerTagRelat
     }
 
 
-    @Override
-    public List<TagVO> getFilteredTagStats(Map<String, String> filters) {
-        // 1. 从前端传来的Map中，提取出所有非空的标签名，形成一个List
-        List<String> activeFilterTags = filters.values().stream()
-                .filter(StringUtils::hasText)
-                .collect(Collectors.toList());
-
-        // 2. 如果没有任何有效的筛选条件，则返回全量统计数据
-        if (activeFilterTags.isEmpty()) {
-            return baseMapper.selectTagStats();
-        }
-
-        // 3. 【核心修改】调用我们唯一的、标准的findCustomerIdsByTags方法
-        List<Long> customerIds = this.findCustomerIdsByTags(activeFilterTags);
-
-        // 4. 如果没有客户符合所有筛选条件，返回空列表
-        if (customerIds.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        // 5. 调用Mapper方法，只统计这些客户的标签分布
-        return baseMapper.selectTagStatsByCustomerIds(customerIds);
-    }
-
-
-    // 【【【 3. 在这里，新增 findCustomerIdsByTags 方法的实现 】】】
+    // 查询同时拥有所有标签的客户
     public List<Long> findCustomerIdsByTags(List<String> tagNames) {
         if (tagNames == null || tagNames.isEmpty()) {
             return Collections.emptyList();

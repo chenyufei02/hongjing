@@ -37,7 +37,7 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
 
     @Autowired
     @Lazy
-    private TagRefreshService tagRefreshService;
+    private TagService tagService;
 
     @Autowired
     private CustomerService customerService;
@@ -144,7 +144,7 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
 
         // 立即为该客户刷新标签
         System.out.println("【实时刷新】交易完成，触发客户 " + transaction.getCustomerId() + " 的标签刷新...");
-        tagRefreshService.refreshTagsForCustomer(transaction.getCustomerId());
+        tagService.refreshTagsForCustomer(transaction.getCustomerId());
         System.out.println("【实时刷新】客户 " + transaction.getCustomerId() + " 的标签已刷新完毕！");
 
         // 步骤3：返回包含ID的完整交易实体

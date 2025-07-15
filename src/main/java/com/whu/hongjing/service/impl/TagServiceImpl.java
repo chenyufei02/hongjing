@@ -4,7 +4,7 @@ import com.whu.hongjing.pojo.entity.Customer;
 import com.whu.hongjing.pojo.entity.FundInfo;
 import com.whu.hongjing.service.CustomerService;
 import com.whu.hongjing.service.FundInfoService;
-import com.whu.hongjing.service.TagRefreshService;
+import com.whu.hongjing.service.TagService;
 import com.whu.hongjing.service.TagRefreshWorker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  * 它的职责是准备数据和管理线程池，将具体的刷新任务分发给 TagRefreshWorker 执行。
  */
 @Service
-public class TagRefreshServiceImpl implements TagRefreshService {
+public class TagServiceImpl implements TagService {
 
     @Autowired private CustomerService customerService;
     @Autowired private FundInfoService fundInfoService;

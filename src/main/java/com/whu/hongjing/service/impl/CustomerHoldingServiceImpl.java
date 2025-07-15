@@ -135,6 +135,8 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
         return true;
     }
 
+
+
     /**
      * 处理一笔新交易后自动更新客户持仓
      *
@@ -184,8 +186,12 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
         this.saveOrUpdate(holding);
     }
 
-
-    // 根据客户姓名、基金代码模糊查询
+    /**
+     * 根据客户姓名、基金代码模糊查询
+     * @return
+     * @author yufei
+     * @since 2025/7/15
+     */
     @Override
     @Transactional(readOnly = true) // 使用只读事务，提高查询性能
     public Page<CustomerHoldingVO> getHoldingPage(
@@ -292,7 +298,6 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
         page.setTotal(holdingPage.getTotal());
         return page;
     }
-
 
 
     @Override
