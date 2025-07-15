@@ -45,9 +45,7 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
     @Autowired
     private FundInfoService fundInfoService;
 
-    /**
-     * 使用@Lazy注解懒加载客户持仓服务，以解决循环依赖问题
-     */
+
     @Autowired
     @Lazy
     private CustomerHoldingService customerHoldingService;
