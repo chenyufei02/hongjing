@@ -45,7 +45,7 @@ public class FundDataImportServiceImpl implements FundDataImportService {
             return 0;
         }
 
-        // --- 后续的解析和保存逻辑保持不变 ---
+        // --- 后续的解析和保存逻辑 ---
 
         // 移除开头的BOM字符和变量赋值部分，直接获取JSON数组
         if (responseText.startsWith("var r = ")) {
@@ -77,7 +77,7 @@ public class FundDataImportServiceImpl implements FundDataImportService {
     }
 
     /**
-     * 【【【 全新升级版：基于规则引擎的基金风险评分方法 】】】
+     * 【 基金风险评分方法 】
      * @param fundType 基金类型字符串
      * @return 1-5分的风险评级
      */

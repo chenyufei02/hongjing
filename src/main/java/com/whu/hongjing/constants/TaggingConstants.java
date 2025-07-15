@@ -3,7 +3,6 @@ package com.whu.hongjing.constants;
 import java.math.BigDecimal;
 
 
-// TODO 新增常量类替换
 /**
  * 客户画像标签体系的常量定义中心。
  * 所有业务规则阈值和标签文本都在此统一管理，便于未来维护和调整。
@@ -45,11 +44,8 @@ public final class TaggingConstants {
     public static final String CATEGORY_OCCUPATION = "职业";
     public static final String CATEGORY_AGE = "年龄分代";
     public static final String CATEGORY_RISK_DECLARED = "申报风险";
-//    public static final String CATEGORY_INVESTMENT_BEHAVIOR = "投资表现";
     public static final String CATEGORY_RISK_ACTUAL = "实盘风险";
     public static final String CATEGORY_RISK_DIAGNOSIS = "风险诊断结果";
-
-
 
 
     // --- 3. 标签文本 (Labels) ---
@@ -95,7 +91,6 @@ public final class TaggingConstants {
     public static final String LABEL_DIAGNOSIS_OVERWEIGHT = "诊断-行为激进";
     public static final String LABEL_DIAGNOSIS_UNDERWEIGHT = "诊断-行为保守";
     public static final String LABEL_DIAGNOSIS_UNKNOWN = "诊断-风险未知";
-
 
 
     /**

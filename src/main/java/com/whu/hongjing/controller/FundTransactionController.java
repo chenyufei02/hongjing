@@ -23,6 +23,7 @@ public class FundTransactionController {
     @Autowired
     private FundTransactionService fundTransactionService;
 
+// ================ 以下没有提供前端接口实现 ================
     @Operation(summary = "申购基金")
     @PostMapping("/purchase")
     public FundTransaction purchase(@RequestBody @Validated FundPurchaseDTO dto) {
@@ -35,6 +36,7 @@ public class FundTransactionController {
         return fundTransactionService.createRedeemTransaction(dto);
     }
 
+// ============ 以下在pagecontroller里优化为了综合根据客户姓名、基金代码、交易类型查询 ============
     @Operation(summary = "根据客户ID查询其所有交易记录")
     @GetMapping("/customer/{customerId}")
     public List<FundTransaction> listByCustomerId(@PathVariable Long customerId) {

@@ -16,6 +16,7 @@ public class TagController {
     @Autowired
     private TagRefreshService tagRefreshService;
 
+    // 【未提供单独刷新一个的前端实现】
     @PostMapping("/refresh/{customerId}")
     @Operation(summary = "【手动触发】刷新指定客户的所有标签")
     public ApiResponseVO refreshCustomerTags(@PathVariable Long customerId) { // <-- 2. 修改返回类型为 ApiResponseVO
@@ -27,6 +28,7 @@ public class TagController {
             return new ApiResponseVO(false, "标签刷新失败: " + e.getMessage());
         }
     }
+
 
     /**
      * 手动触发一次对所有客户的全量画像刷新。(异步操作，接口会立即返回，后台将开始执行耗时的批量任务。)

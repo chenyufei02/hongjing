@@ -193,7 +193,7 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
             transactionQueryWrapper.eq("transaction_type", transactionType);
         }
 
-        // 【【【 新增的排序逻辑 】】】
+        // 【 排序逻辑 】
         if (StringUtils.hasText(sortField) && StringUtils.hasText(sortOrder)) {
             String dbColumn;
             // 手动将前端传来的驼峰字段名，转换为数据库的下划线列名
@@ -220,32 +220,35 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
         }
 
         Page<FundTransaction> transactionPage = new Page<>(page.getCurrent(), page.getSize());
-        this.page(transactionPage, transactionQueryWrapper);
+        this.page(transactionPage, transactionQueryWrapper);  // 根据查询规则 返回指定页面 以及总记录数和总页数
 
-        List<FundTransaction> transactionRecords = transactionPage.getRecords();
-        if (transactionRecords.isEmpty()) {
-            return page.setRecords(Collections.emptyList());
-        }
+        List<FundTransaction> transactionRecords = transactionPage.getRecords();  // 页面里的信息放到列表供进一步操作
+
+        if (transactionRecords.isEmpty()) { return page.setRecords(Collections.emptyList()); }
 
         // 步骤 3: 批量获取关联的客户和基金信息
+            // 根据模糊匹配名字得到的数据找不重复的客户和基金ID
         List<Long> resultCustomerIds = transactionRecords.stream().map(FundTransaction::getCustomerId).distinct().collect(Collectors.toList());
         List<String> resultFundCodes = transactionRecords.stream().map(FundTransaction::getFundCode).distinct().collect(Collectors.toList());
-
+            // 将不重复的客户和基金ID映射到姓名 供后续返回VO对象的时候好根据ID找到姓名
         Map<Long, String> customerIdToNameMap = customerService.listByIds(resultCustomerIds).stream()
                 .collect(Collectors.toMap(Customer::getId, Customer::getName));
         Map<String, String> fundCodeToNameMap = fundInfoService.listByIds(resultFundCodes).stream()
                 .collect(Collectors.toMap(FundInfo::getFundCode, FundInfo::getFundName));
 
         // 步骤 4: 组装最终的 FundTransactionVO 列表
-        List<FundTransactionVO> voRecords = transactionRecords.stream().map(transaction -> {
+        List<FundTransactionVO> voRecords = transactionRecords.stream().map(transactionrecords -> {
+
             FundTransactionVO vo = new FundTransactionVO();
+
             // 复制所有交易信息
-            BeanUtils.copyProperties(transaction, vo);
-            // 填充关联的名称信息
-            vo.setCustomerName(customerIdToNameMap.get(transaction.getCustomerId()));
-            vo.setFundName(fundCodeToNameMap.get(transaction.getFundCode()));
+            BeanUtils.copyProperties(transactionrecords, vo);   // 将已经找到的交易页的信息（转换存进了transactionRecords列表对象） 全部拷贝到VO对象
+
+            // 然后再向VO对象里填充关联的名称信息
+            vo.setCustomerName(customerIdToNameMap.get(transactionrecords.getCustomerId()));
+            vo.setFundName(fundCodeToNameMap.get(transactionrecords.getFundCode()));
             return vo;
-        }).collect(Collectors.toList());
+        }).collect(Collectors.toList());  //
 
         // 步骤 5: 设置分页结果并返回
         page.setRecords(voRecords);

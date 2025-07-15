@@ -1,4 +1,3 @@
-// 文件: src/main/java/com/whu/hongjing/service/impl/AISuggestionServiceImpl.java
 package com.whu.hongjing.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,7 +13,6 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;

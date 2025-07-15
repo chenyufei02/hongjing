@@ -67,6 +67,7 @@ public class MockDataServiceImpl implements MockDataService {
                 Faker faker = new Faker(Locale.CHINA);
                 Random random = ThreadLocalRandom.current();
                 Customer customer = new Customer();
+
                 customer.setName(faker.name().fullName());
                 customer.setGender(random.nextBoolean() ? "男" : "女");
                 customer.setIdType("身份证");
@@ -194,7 +195,7 @@ public class MockDataServiceImpl implements MockDataService {
         List<FundInfo> allFunds = new ArrayList<>(fundInfoMap.values());
 
 
-        // --- 2. 【核心改造】第一阶段：并发计算所有客户的模拟交易数据 ---
+        // --- 2. 第一阶段：并发计算所有客户的模拟交易数据 ---
         int corePoolSize = Runtime.getRuntime().availableProcessors();
         ThreadFactory calcThreadFactory = new ThreadFactoryBuilder().setNameFormat("mock-data-thread-%d").build();
         ExecutorService calcExecutor = new ThreadPoolExecutor(
@@ -283,10 +284,13 @@ public class MockDataServiceImpl implements MockDataService {
                          // 赎回一定是已有持仓的数据 且只影响总份额 不影响平均成本 因此只用修改总份额
                          holding.setTotalShares(holding.getTotalShares().subtract(redeemShares));
                      }
+
                      // 更新最近交易时间 和 当前客户对当前操作的基金的持仓数据（holding）
                      holding.setLastUpdateDate(transactionTime);
-                     customerHoldings.put(targetFund.getFundCode(), holding);  // 将当前客户当天更新过的目标基金的持仓数据put进当前用户的总持仓表（key是基金code）
+                     // 将当前客户当天更新过的目标基金的持仓数据put进当前用户的总持仓表（key是基金code）
+                     customerHoldings.put(targetFund.getFundCode(), holding);
                         // （交易数据已经在申购和赎回方法内部提前添加到了当前用户的交易数据表）
+
                 } // 到这里一天循环执行完毕
 
                 Map<String, Object> result = new HashMap<>();

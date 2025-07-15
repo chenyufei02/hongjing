@@ -9,6 +9,12 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import com.baomidou.mybatisplus.annotation.TableField;
 
+/**
+ * 对应客户的量化指标表（总资产M 近期交易行为R 交易频率F） 需要经常大量计算和更新的表
+ * @return
+ * @author yufei
+ * @since 2025/7/14
+ */
 @Data
 @NoArgsConstructor
 @TableName("customer_profile")
@@ -40,7 +46,7 @@ public class CustomerProfile {
      * 加上 @Version 注解后, 在执行更新操作时，
      * MyBatis-Plus会自动将此字段作为where条件，并将其值+1。
      */
-    @Version // 2. 【核心修改】添加 @Version 注解
+    @Version // 添加 @Version 注解
     private Integer version;
 
     // 创建一个方便使用的构造函数

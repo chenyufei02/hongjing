@@ -48,7 +48,6 @@ public class DashboardController {
     @PostMapping("/filtered-stats")
     @Operation(summary = "【重量级】根据筛选条件，获取图表数据和客户列表第一页")
     public DashboardFilteredResultVO getFilteredStats(@RequestBody Map<String, Object> payload) {
-        @SuppressWarnings("unchecked")
         Map<String, String> filters = (Map<String, String>) payload.get("filters");
 
         DashboardFilteredResultVO result = new DashboardFilteredResultVO();
@@ -66,12 +65,11 @@ public class DashboardController {
     }
 
     /**
-     * 【【【 新增的、轻量级API，专门用于客户列表分页查询 】】】
+     * 【【【 专门用于客户列表分页查询 】】】
      */
     @PostMapping("/filtered-customers")
     @Operation(summary = "【轻量级】根据筛选条件，仅获取客户列表的指定页")
     public Page<Customer> getFilteredCustomers(@RequestBody Map<String, Object> payload) {
-        @SuppressWarnings("unchecked")
         Map<String, String> filters = (Map<String, String>) payload.get("filters");
         int pageNum = (int) payload.getOrDefault("page", 1);
         int pageSize = (int) payload.getOrDefault("size", 10);
@@ -88,7 +86,7 @@ public class DashboardController {
                 .collect(Collectors.toList());
 
         Page<Customer> customerPage = new Page<>(pageNum, pageSize);
-        // 调用我们之前已经写好的、强大的客户分页查询方法
+        // 调用已经写好的、强大的客户分页查询方法
         customerService.getCustomerPage(customerPage, null, null, null, String.join(",", activeFilterTags));
         return customerPage;
     }

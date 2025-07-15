@@ -3,16 +3,16 @@ package com.whu.hongjing.service.impl;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.whu.hongjing.mapper.CustomerMapper;
 import com.whu.hongjing.pojo.entity.Customer;
-import com.whu.hongjing.pojo.entity.CustomerTagRelation;
+//import com.whu.hongjing.pojo.entity.CustomerTagRelation;
 import com.whu.hongjing.service.CustomerService;
 import com.whu.hongjing.service.CustomerTagRelationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import java.util.ArrayList;
+//import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
+//import java.util.stream.Collectors;
 import org.springframework.util.StringUtils;
 import com.whu.hongjing.pojo.vo.ProfitLossVO;
 import java.util.Arrays;
@@ -23,38 +23,33 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
     @Autowired
     private CustomerMapper customerMapper;
-
     @Autowired
     private CustomerTagRelationService customerTagRelationService;
 
+    // 删除的方法
     @Override
     public boolean removeCustomer(Long id) {
-        return customerMapper.deleteById(id) > 0;
+        return customerMapper.deleteById(id) > 0;  // MP提供的方法
     }
 
+    // 更新（编辑）的方法
     @Override
     public boolean updateCustomer(Customer customer) {
-        return customerMapper.updateById(customer) > 0;
+        return customerMapper.updateById(customer) > 0;  // MP提供的方法 根据已有的ID更新
     }
 
+    // 新增的方法
+    @Override
+    public boolean save(Customer entity) {
+        return super.save(entity);  // MP提供的方法
+    }
+
+    // 唯一保留下来的根据ID查找的方法
     @Override
     public Customer getCustomerById(Long id) {
         return customerMapper.selectById(id);
     }
 
-    @Override
-    public Customer getCustomerByIdNumber(String idNumber) {
-        QueryWrapper<Customer> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("id_number", idNumber);
-        return this.getOne(queryWrapper); // getOne确保只返回一条记录
-    }
-
-    @Override
-    public List<Customer> getCustomersByName(String name) {
-        QueryWrapper<Customer> queryWrapper = new QueryWrapper<>();
-        queryWrapper.like("name", name);
-        return this.list(queryWrapper); // list会返回所有匹配的记录
-    }
 
 
     /**
@@ -65,30 +60,40 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
             Page<Customer> page, Long customerId, String name,
             String idNumber, String tagName)
     {
-        QueryWrapper<Customer> queryWrapper = new QueryWrapper<>();
+        QueryWrapper<Customer> queryWrapper = new QueryWrapper<>();  // 默认的初始查询语句 类似select * from Customer表
 
+        // 保证按ID查询是优先级最高的查询，只要有ID的时候就先按ID判断返回
         if (customerId != null) {
-            queryWrapper.eq("id", customerId);
-            return this.page(page, queryWrapper);
+            queryWrapper.eq("id", customerId);  // where id = customerId
+
+            // 1、MP自动拦截此.page调用，通过传入的querywrapper查询语句统计到总记录数传给page
+            // 2、然后加上page里的参数（当前页 也就是想要第pageNum页的数据, 每页pageSize条数据）--》  limit pageSize offset (pageNum-1)*pageSize
+            //    返回当前页和当前页要的数据
+            // 3、MP根据total和当前的pagesize自动计算出总页数，传给page。这样此时的page对象就是一个完整的对象了，包含了：
+                // 总记录数(MP根据queryWrapper计算来)
+                // 总页数(MP根据queryWrapper计算来)
+                // 当前页数(原page创建的时候传入的参数带来)
+                // 每页记录数(原page创建的时候传入的参数带来)
+            return this.page(page, queryWrapper);  // 返回这个修改之后的page对象 传回当前页的数据
         }
 
-        // --- 【【【 核心升级逻辑 】】】 ---
-        // 为了兼容旧的单标签查询和未来的多标签查询，我们统一处理
+
         if (StringUtils.hasText(tagName)) {
-            // 将单个tagName转换为列表，调用我们新的多标签查询方法
-            List<String> tagList = Arrays.asList(tagName.split(","));
+            // 单个多个tagName都要统一转换为列表，才好调用多标签查询方法
+            List<String> tagList = Arrays.asList(tagName.split(" "));
+            // 这里调用了外面根据tags查询客户ID的方法
             List<Long> customerIds = customerTagRelationService.findCustomerIdsByTags(tagList);
 
             if (customerIds.isEmpty()) {
                 // 如果根据标签没有找到任何客户，直接返回空结果，避免无效查询
                 return new Page<>(page.getCurrent(), page.getSize(), 0);
             }
-            queryWrapper.in("id", customerIds);
+            queryWrapper.in("id", customerIds);  // 把根据TAGS模糊查询（in）的SQL语句添加进querywrapper
         }
 
 
         if (StringUtils.hasText(name)) {
-            queryWrapper.like("name", name);
+            queryWrapper.like("name", name);  // 把根据name模糊的SQL语句添加进querywrapper
         }
         if (StringUtils.hasText(idNumber)) {
             queryWrapper.like("id_number", idNumber);
@@ -100,36 +105,10 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
     }
 
 
-    @Override
-    public boolean save(Customer entity) {
-        return super.save(entity);
-    }
-
-    @Override
-    public List<Customer> getCustomersByTag(String tagName) {
-        // 1. 先从标签关系表中，找到所有拥有该标签的 customer_id
-        QueryWrapper<CustomerTagRelation> tagQuery = new QueryWrapper<>();
-        tagQuery.eq("tag_name", tagName);
-        tagQuery.select("customer_id"); // 我们只关心 customer_id 这一列
-
-        List<Long> customerIds = customerTagRelationService.list(tagQuery)
-                .stream()
-                .map(CustomerTagRelation::getCustomerId)
-                .collect(Collectors.toList());
-
-        if (customerIds.isEmpty()) {
-            // 如果没有任何客户拥有这个标签，直接返回空列表，避免无效查询
-            return new ArrayList<>();
-        }
-
-        // 2. 根据找到的 customer_id 列表，一次性查询出所有客户的详细信息
-        return this.listByIds(customerIds);
-    }
-
 
     @Override
     public Page<ProfitLossVO> getProfitLossPage(Page<ProfitLossVO> page, Long customerId, String customerName, String sortField, String sortOrder) {
-        // 【已更新】将 customerId 参数传递给Mapper层
+        // 将 customerId 参数传递给Mapper层
         return baseMapper.getProfitLossPage(page, customerId, customerName, sortField, sortOrder);
     }
 

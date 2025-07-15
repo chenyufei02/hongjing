@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 import java.time.LocalDate;
 
 /**
- * 客户基础信息实体类
+ * 对应展示客户详细信息的基础信息表
  */
 @Data // Lombok 自动生成getter/setter/toString等方法
 @TableName("customer") // 指定对应数据库表名

@@ -52,7 +52,7 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
     }
 
     /**
-     * 手动更新用户持仓情况的方法，用于修正持仓表，因为有可能有在自动更新持仓功能之前就已经存进来的数据
+     * 【辅助系统修正】手动更新用户持仓情况的方法，用于修正持仓表，因为有可能有在自动更新持仓功能之前就已经存进来的数据
      *
      * @param customerId
      * @return boolean
@@ -184,13 +184,17 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
         this.saveOrUpdate(holding);
     }
 
+
+    // 根据客户姓名、基金代码模糊查询
     @Override
     @Transactional(readOnly = true) // 使用只读事务，提高查询性能
     public Page<CustomerHoldingVO> getHoldingPage(
             Page<CustomerHoldingVO> page, String customerName,
             String fundCode, String sortField, String sortOrder) {
-        // --- 步骤 1: 根据查询条件，筛选出符合条件的客户ID和基金代码 ---
+        // --- 步骤 1: 根据查询条件，如果输入了客户姓名的话就筛选出符合条件的客户ID ---
+
         List<Long> customerIds = null;
+
         if (StringUtils.hasText(customerName)) {
             // 根据客户姓名模糊查询，获取所有匹配的客户ID
             customerIds = customerService.lambdaQuery()
@@ -206,7 +210,9 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
         }
 
         // --- 步骤 2: 构建对持仓表 (customer_holding) 的分页查询 ---
+
         QueryWrapper<CustomerHolding> holdingQueryWrapper = new QueryWrapper<>();
+
         if (customerIds != null) {
             holdingQueryWrapper.in("customer_id", customerIds);
         }
@@ -214,7 +220,7 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
             holdingQueryWrapper.like("fund_code", fundCode);
         }
 
-        // 【【【 新增的排序逻辑 】】】
+        // 【 排序逻辑 】
         if (StringUtils.hasText(sortField) && StringUtils.hasText(sortOrder)) {
             String dbColumn;
             // 手动将前端传来的驼峰字段名，转换为数据库的下划线列名
@@ -245,17 +251,18 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
         Page<CustomerHolding> holdingPage = new Page<>(page.getCurrent(), page.getSize());
         this.page(holdingPage, holdingQueryWrapper);
 
-        List<CustomerHolding> holdingRecords = holdingPage.getRecords();
+        List<CustomerHolding> holdingRecords = holdingPage.getRecords();  // 一页里的所有holding数据
+
         if (holdingRecords.isEmpty()) {
             return page.setRecords(Collections.emptyList());
         }
 
         // --- 步骤 3: 批量获取关联的客户和基金信息，以提高性能 ---
-        // 提取所有需要的 customerId 和 fundCode
+        // 【根据名字找到ID】提取所有需要的 customerId（根据传入的客户名模糊匹配的数据的ID） 和 fundCode（根据传入的code模糊匹配的数据的fundcode）
         List<Long> resultCustomerIds = holdingRecords.stream().map(CustomerHolding::getCustomerId).distinct().collect(Collectors.toList());
         List<String> resultFundCodes = holdingRecords.stream().map(CustomerHolding::getFundCode).distinct().collect(Collectors.toList());
 
-        // 一次性查询出所有相关的客户和基金信息
+        // 【组装VO对象时好根据ID找回名字】一次性查询出所有相关的客户和基金信息（ID映射名字）
         Map<Long, String> customerIdToNameMap = customerService.listByIds(resultCustomerIds).stream()
                 .collect(Collectors.toMap(Customer::getId, Customer::getName));
         Map<String, String> fundCodeToNameMap = fundInfoService.listByIds(resultFundCodes).stream()
@@ -263,12 +270,15 @@ public class CustomerHoldingServiceImpl extends ServiceImpl<CustomerHoldingMappe
 
         // --- 步骤 4: 组装最终的 CustomerHoldingVO 列表 ---
         List<CustomerHoldingVO> voRecords = holdingRecords.stream().map(holding -> {
+
             CustomerHoldingVO vo = new CustomerHoldingVO();
+
             vo.setId(holding.getId());
             vo.setTotalShares(holding.getTotalShares());
             vo.setAverageCost(holding.getAverageCost());
             vo.setMarketValue(holding.getMarketValue());
             vo.setLastUpdateDate(holding.getLastUpdateDate());
+
             vo.setCustomerId(holding.getCustomerId());
             vo.setFundCode(holding.getFundCode());
             // 从Map中获取关联的名称

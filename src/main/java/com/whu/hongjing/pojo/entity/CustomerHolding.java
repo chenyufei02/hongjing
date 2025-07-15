@@ -40,7 +40,7 @@ public class CustomerHolding {
     private BigDecimal marketValue;
 
     /**
-     * 持仓平均成本。计算客户买入这只基金的平均单位价格，是计算盈亏的关键指标。
+     * 持仓平均成本。计算客户【买入】这只基金的平均单位价格，是计算盈亏的关键指标。
      */
     private BigDecimal averageCost;
 

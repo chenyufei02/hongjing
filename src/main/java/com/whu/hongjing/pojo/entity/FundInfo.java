@@ -17,7 +17,7 @@ public class FundInfo {
 
     private String fundType;
 
-    private Integer riskScore;
+    private Integer riskScore;  // 风险分数
 
     private BigDecimal netValue;
 

@@ -35,7 +35,7 @@ public class CustomerTagServiceImpl implements CustomerTagService {
         // b. 计算性别标签
         tags.add(new CustomerTagVO(customer.getGender()));
 
-        // c. (未来我们可以在这里添加更多标签的计算，比如风险等级、资产规模等)
+        // c. (可以在这里添加更多标签的计算，比如风险等级、资产规模等)
 
         return tags;
     }

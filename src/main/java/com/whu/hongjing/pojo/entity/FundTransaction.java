@@ -22,7 +22,7 @@ public class FundTransaction {
 
     private BigDecimal transactionShares;  // 交易份额
 
-    private BigDecimal sharePrice;       // 成交净值
+    private BigDecimal sharePrice;       // 成交净值（模拟）
 
     private LocalDateTime transactionTime;
 

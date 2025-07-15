@@ -8,7 +8,6 @@ import com.whu.hongjing.constants.TaggingConstants;
 import com.whu.hongjing.enums.RiskLevelEnum;
 import com.whu.hongjing.pojo.dto.CustomerDTO;
 import com.whu.hongjing.pojo.dto.CustomerUpdateDTO;
-import com.whu.hongjing.pojo.dto.FundInfoDTO;
 import com.whu.hongjing.pojo.entity.*;
 import com.whu.hongjing.pojo.vo.*;
 import com.whu.hongjing.service.*;
@@ -20,7 +19,6 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
@@ -54,11 +52,13 @@ public class PageController {
     @GetMapping("/")
     public String index(Model model) {
         model.addAttribute("activeUri", "/");
-        return "index";
+        return "index";  // SpringBoot的视图解析器会根据这个返回的字符串，找到templates文件夹下名为index.html的文件，并将其内容渲染成最终的网页。
     }
 
+
+// ===================================客户管理===================================
     /**
-     * 显示客户列表页面
+     * 显示客户管理列表页面
      */
     @GetMapping("/customer/list")
     public String customerList(Model model,
@@ -67,15 +67,21 @@ public class PageController {
            @RequestParam(value = "id", required = false) Long customerId,
            @RequestParam(value = "name", required = false) String name,
            @RequestParam(value = "idNumber", required = false) String idNumber,
-           @RequestParam(value = "tagName", required = false) String tagName) {
+           @RequestParam(value = "tagName", required = false) String tagName)
+    {
+        // page对象的四个主要属性： 总记录数 总页数 当前页数 每页显示的记录数。 下面只设置了当前页数（pageNum）和每页显示的记录数(pageSize)
+        // 每次点击的时候就会传入新的pageNum 读到新的指定页
+        Page<Customer> customerPage = new Page<>(pageNum, pageSize);  // 初始的时候分别是默认显示第1页和10条数据 因此page里已经有了分页要求的参数
 
-        Page<Customer> customerPage = new Page<>(pageNum, pageSize);
+        // 根据条件查询客户，返回的是查询过后的完整的customerPage，在查询的方法里添加上了总记录数和总页数的两个属性。
         customerService.getCustomerPage(customerPage, customerId, name, idNumber, tagName);
 
         int startPage = 1, endPage = (int) customerPage.getPages();
+
         if (customerPage.getPages() > 5) {
             startPage = Math.max(1, (int)customerPage.getCurrent() - 2);
             endPage = Math.min((int)customerPage.getPages(), startPage + 4);
+            // 输入了更大的页的时候也只能跳转到最后一页
             if (endPage > customerPage.getPages()) {
                 endPage = (int) customerPage.getPages();
             }
@@ -100,49 +106,12 @@ public class PageController {
      * 显示新增客户的表单页面
      */
     @GetMapping("/customer/add")
-    public String showAddForm(Model model) {
+    public String showAddForm(Model model)
+    {
         model.addAttribute("customerDTO", new CustomerDTO());
         model.addAttribute("activeUri", "/customer/list");
-        return "customer/add";
-    }
-
-    /**
-     * 【最终重构版：无任何冗余代码，逻辑清晰】
-     * 显示客户详情页面，加载所有必要数据
-     */
-    @GetMapping("/customer/detail/{id}")
-    public String showDetailView(
-            @PathVariable Long id, Model model,
-            @RequestParam(required = false) String name,
-            @RequestParam(required = false) String idNumber,
-            @RequestParam(required = false) String tagName,
-            @RequestParam(required = false) String returnUrl) {
-
-        // 1. 获取客户基础数据
-        Customer customer = customerService.getCustomerById(id);
-        if (customer == null) {
-            return "redirect:/customer/list";
-        }
-        model.addAttribute("customer", customer);
-        model.addAttribute("stats", customerService.getProfitLossVO(id));
-        model.addAttribute("activeUri", "/customer/list");
-        model.addAttribute("backUrl", buildBackUrl(name, idNumber, tagName, returnUrl));
-
-        // 2. 获取并处理所有标签，用于分组展示
-        List<CustomerTagRelation> allTags = customerTagRelationService.list(new QueryWrapper<CustomerTagRelation>().eq("customer_id", id));
-        model.addAttribute("basicProfileTags", filterTagsByCategory(allTags, List.of(TaggingConstants.CATEGORY_AGE, TaggingConstants.CATEGORY_GENDER, TaggingConstants.CATEGORY_OCCUPATION)));
-        model.addAttribute("assetTags", filterTagsByCategory(allTags, List.of(TaggingConstants.CATEGORY_ASSET)));
-        model.addAttribute("styleTags", filterTagsByCategory(allTags, List.of(TaggingConstants.CATEGORY_STYLE)));
-        model.addAttribute("tradingHabitTags", sortAndFilterTags(allTags, List.of(TaggingConstants.CATEGORY_RECENCY, TaggingConstants.CATEGORY_FREQUENCY)));
-        model.addAttribute("riskProfileTags", sortAndFilterTags(allTags, List.of(TaggingConstants.CATEGORY_RISK_DECLARED, TaggingConstants.CATEGORY_RISK_ACTUAL, TaggingConstants.CATEGORY_RISK_DIAGNOSIS)));
-
-        // 3. 准备图表所需的数据
-        prepareChartData(id, model);
-        prepareHistoricalData(id, model);
-        // 4. 【新增】获取Top 10持仓列表
-        model.addAttribute("topHoldings", customerHoldingService.getTopNHoldings(id, 10));
-
-        return "customer/detail";
+        return "customer/add";  // // SpringBoot的解析器后会先找到templates文件夹下customer包里add.html的文件，并将其渲染成新增客户的页面。
+        // 当用户在新增客户的页面里点击提交按钮以后 前段的script脚本才会自动跳转到后端的/api/customer/add 里的POST请求 用户填好的DTO对象传入提交。
     }
 
     /**
@@ -152,7 +121,8 @@ public class PageController {
     public String showEditForm(@PathVariable Long id, Model model,
            @RequestParam(required = false) String name,
            @RequestParam(required = false) String idNumber,
-           @RequestParam(required = false) String tagName) {
+           @RequestParam(required = false) String tagName)
+    {
         Customer customer = customerService.getCustomerById(id);
         if (customer == null) {
             return "redirect:/customer/list";
@@ -165,8 +135,12 @@ public class PageController {
         return "customer/edit";
     }
 
+    // 客户管理里删除不用专门的表单页面，详情的表单页面由于内容较多放在了最后。
+
+
+// ===================================基金管理===================================
     /**
-     * 显示基金信息列表页面
+     * 显示基金管理列表页面
      */
     @GetMapping("/fund/list")
     public String fundList(Model model,
@@ -175,9 +149,13 @@ public class PageController {
            @RequestParam(required = false) String fundCode,
            @RequestParam(required = false) String fundName,
            @RequestParam(required = false) String fundType,
-           @RequestParam(required = false) Integer riskScore) {
+           @RequestParam(required = false) Integer riskScore)
+    {
         Page<FundInfo> fundPage = new Page<>(pageNum, pageSize);
+
+        // 核心查询方法
         fundInfoService.getFundInfoPage(fundPage, fundCode, fundName, fundType, riskScore);
+
         int startPage = 1, endPage = (int) fundPage.getPages();
         if (fundPage.getPages() > 5) {
             startPage = Math.max(1, (int)fundPage.getCurrent() - 2);
@@ -197,8 +175,9 @@ public class PageController {
     }
 
 
+// ===================================持仓管理===================================
     /**
-     * 显示客户持仓列表页面
+     * 显示持仓管理列表页面
      */
     @GetMapping("/holding/list")
     public String holdingList(Model model,
@@ -207,9 +186,13 @@ public class PageController {
             @RequestParam(required = false) String customerName,
             @RequestParam(required = false) String fundCode,
             @RequestParam(required = false) String sortField,
-            @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
+            @RequestParam(required = false, defaultValue = "desc") String sortOrder)
+    {
         Page<CustomerHoldingVO> holdingPage = new Page<>(pageNum, pageSize);
+
+        // 根据条件分页查询持仓页面
         customerHoldingService.getHoldingPage(holdingPage, customerName, fundCode, sortField, sortOrder);
+
         int startPage = 1, endPage = (int) holdingPage.getPages();
         if (holdingPage.getPages() > 5) {
             startPage = Math.max(1, (int)holdingPage.getCurrent() - 2);
@@ -227,8 +210,9 @@ public class PageController {
         return "holding/list";
     }
 
+// ===================================交易管理===================================
     /**
-     * 显示交易流水列表页面
+     * 显示交易管理列表页面
      */
     @GetMapping("/transaction/list")
     public String transactionList(Model model,
@@ -238,10 +222,14 @@ public class PageController {
             @RequestParam(required = false) String fundCode,
             @RequestParam(required = false) String transactionType,
             @RequestParam(required = false) String sortField,
-            @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
+            @RequestParam(required = false, defaultValue = "desc") String sortOrder)
+    {
         Page<FundTransactionVO> transactionPage = new Page<>(pageNum, pageSize);
+
         fundTransactionService.getTransactionPage(transactionPage, customerName, fundCode, transactionType, sortField, sortOrder);
+
         int startPage = 1, endPage = (int) transactionPage.getPages();
+
         if (transactionPage.getPages() > 5) {
             startPage = Math.max(1, (int)transactionPage.getCurrent() - 2);
             endPage = Math.min((int)transactionPage.getPages(), startPage + 4);
@@ -259,8 +247,10 @@ public class PageController {
         return "transaction/list";
     }
 
+
+// ===================================风险管理===================================
     /**
-     * 显示风险评估列表页面
+     * 显示风险管理列表页面
      */
     @GetMapping("/risk/list")
     public String riskList(Model model,
@@ -271,7 +261,8 @@ public class PageController {
             @RequestParam(required = false) String actualRiskLevel,
             @RequestParam(required = false) String riskDiagnosis,
             @RequestParam(required = false, defaultValue = "id") String sortField,
-            @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
+            @RequestParam(required = false, defaultValue = "desc") String sortOrder)
+    {
         Page<RiskAssessmentVO> assessmentPage = new Page<>(pageNum, pageSize);
         riskAssessmentService.getAssessmentPage(assessmentPage, customerName, riskLevel, actualRiskLevel, riskDiagnosis, sortField, sortOrder);
         int startPage = 1, endPage = (int) assessmentPage.getPages();
@@ -295,11 +286,14 @@ public class PageController {
         return "risk/list";
     }
 
+
+// ===================================标签管理===================================
     /**
      * 显示标签管理页面
      */
     @GetMapping("/tag/list")
-    public String tagList(Model model) throws JsonProcessingException {
+    public String tagList(Model model) throws JsonProcessingException
+    {
         List<TagVO> allTags = customerTagRelationService.getTagStats();
         List<String> categoryOrder = List.of(
             TaggingConstants.CATEGORY_AGE, TaggingConstants.CATEGORY_GENDER, TaggingConstants.CATEGORY_OCCUPATION,
@@ -316,27 +310,22 @@ public class PageController {
         return "tag/list";
     }
 
-    /**
-     * 显示可视化画像仪表盘页面
-     */
-    @GetMapping("/visualization/dashboard")
-    public String showDashboard(Model model) {
-        model.addAttribute("activeUri", "/visualization/dashboard");
-        return "visualization/dashboard";
-    }
 
+// ===================================盈亏管理===================================
     /**
-     * 显示客户盈亏排行榜页面
+     * 显示客户盈亏管理页面
      */
     @GetMapping("/profitloss/list")
     public String profitLossList(Model model,
-                                 @RequestParam(value = "page", defaultValue = "1") int pageNum,
-                                 @RequestParam(value = "size", defaultValue = "10") int pageSize,
-                                 @RequestParam(required = false) Long customerId,
-                                 @RequestParam(required = false) String customerName,
-                                 @RequestParam(required = false, defaultValue = "totalProfitLoss") String sortField,
-                                 @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
+             @RequestParam(value = "page", defaultValue = "1") int pageNum,
+             @RequestParam(value = "size", defaultValue = "10") int pageSize,
+             @RequestParam(required = false) Long customerId,
+             @RequestParam(required = false) String customerName,
+             @RequestParam(required = false, defaultValue = "totalProfitLoss") String sortField,
+             @RequestParam(required = false, defaultValue = "desc") String sortOrder)
+    {
         Page<ProfitLossVO> page = new Page<>(pageNum, pageSize);
+        // 按照指定的参数筛选以后排序 返回排序后的page页面
         customerService.getProfitLossPage(page, customerId, customerName, sortField, sortOrder);
 
         int startPage = 1, endPage = (int) page.getPages();
@@ -357,17 +346,66 @@ public class PageController {
     }
 
 
+// ===================================统计仪表盘===================================
+    /**
+     * 显示统计仪表盘页面
+     */
+    @GetMapping("/visualization/dashboard")
+    public String showDashboard(Model model)
+    {
+        model.addAttribute("activeUri", "/visualization/dashboard");
+        return "visualization/dashboard";
+    }
+
+
+// ===================================补充：客户管理【详情页】===================================
+    /**
+     * 显示客户详情页面，加载所有必要数据
+ */
+    @GetMapping("/customer/detail/{id}")
+    public String showDetailView(
+            @PathVariable Long id, Model model,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String idNumber,
+            @RequestParam(required = false) String tagName,
+            @RequestParam(required = false) String returnUrl)
+    {
+
+        // 1. 获取客户基础数据
+        Customer customer = customerService.getCustomerById(id);
+        if (customer == null) {
+            return "redirect:/customer/list";
+        }
+        model.addAttribute("customer", customer);
+        model.addAttribute("stats", customerService.getProfitLossVO(id));
+        model.addAttribute("activeUri", "/customer/list");
+        model.addAttribute("backUrl", buildBackUrl(name, idNumber, tagName, returnUrl));
+
+        // 2. 获取并处理所有标签，用于分组展示
+            // 这里的customerTagRelationService.list是MP提供的方法，将指定的查询条件构造器应用到指定的表里进行查询，结果组装成列表
+        List<CustomerTagRelation> allTags = customerTagRelationService.list(new QueryWrapper<CustomerTagRelation>().eq("customer_id", id));
+
+        model.addAttribute("basicProfileTags", filterTagsByCategory(allTags, List.of(TaggingConstants.CATEGORY_AGE, TaggingConstants.CATEGORY_GENDER, TaggingConstants.CATEGORY_OCCUPATION)));
+        model.addAttribute("assetTags", filterTagsByCategory(allTags, List.of(TaggingConstants.CATEGORY_ASSET)));
+        model.addAttribute("styleTags", filterTagsByCategory(allTags, List.of(TaggingConstants.CATEGORY_STYLE)));
+        model.addAttribute("tradingHabitTags", sortAndFilterTags(allTags, List.of(TaggingConstants.CATEGORY_RECENCY, TaggingConstants.CATEGORY_FREQUENCY)));
+        model.addAttribute("riskProfileTags", sortAndFilterTags(allTags, List.of(TaggingConstants.CATEGORY_RISK_DECLARED, TaggingConstants.CATEGORY_RISK_ACTUAL, TaggingConstants.CATEGORY_RISK_DIAGNOSIS)));
+
+        // 3. 准备图表所需的数据
+        prepareChartData(id, model);  // 投资分析图表
+        prepareHistoricalData(id, model);  // 历史走势图表
+
+        // 4. 获取Top 10持仓列表
+        model.addAttribute("topHoldings", customerHoldingService.getTopNHoldings(id, 10));
+
+        return "customer/detail";
+    }
 
 
 
 
 
-
-
-
-
-
-    // ========== 私有辅助方法 (Private Helper Methods) ==========
+// =================================== 私有辅助方法 (Private Helper Methods) ===================================
 
     private void prepareChartData(Long customerId, Model model) {
         List<CustomerHolding> holdings = customerHoldingService.listByCustomerId(customerId);
@@ -423,7 +461,7 @@ public class PageController {
     }
 
     /**
-     * 【【【 最终版：为历史走势双曲线图和资金流图准备数据 】】】
+     * 【 为历史走势双曲线图和资金流图准备数据 】
      */
     private void prepareHistoricalData(Long customerId, Model model) {
         List<FundTransaction> transactions = fundTransactionService.list(
@@ -505,7 +543,7 @@ public class PageController {
 
 
     /**
-     * 【【【 最终版：封装风险洞察雷达图的数据计算过程，统一风险指向性 】】】
+     * 【 封装风险洞察雷达图的数据计算过程，统一风险指向性 】
      */
     private Map<String, BigDecimal> calculateRiskInsightData(Long customerId, List<CustomerHolding> holdings, Map<String, FundInfo> fundInfoMap, BigDecimal totalMarketValue) {
         // --- 基础数据计算 (不变) ---
@@ -539,7 +577,9 @@ public class PageController {
         return riskInsightData;
     }
 
+    // 根据一组标签名字列表里的任意多个标签名，将数据筛选成只保留这些标签名的数据
     private List<CustomerTagRelation> filterTagsByCategory(List<CustomerTagRelation> allTags, List<String> categories) {
+        // 只有包含在传进来的目标标签名列表里的标签数据，才能通过筛选装进列表返回。
         return allTags.stream().filter(t -> categories.contains(t.getTagCategory())).collect(Collectors.toList());
     }
 
@@ -555,7 +595,7 @@ public class PageController {
     }
 
     /**
-     * 【最终版】计算客户的行为激进程度分数
+     * 计算客户的行为激进程度分数
      * @param diagnosisTag 客户的风险诊断标签
      * @return 0 (保守/未知), 50 (匹配), 100 (激进)
      */
@@ -572,7 +612,6 @@ public class PageController {
         return BigDecimal.ZERO;
     }
 
-    // 【【【 这是新的、已修正的代码 】】】
     private BigDecimal filterAndSum(List<CustomerHolding> holdings, Map<String, FundInfo> fundInfoMap, List<String> types) {
         return holdings.stream()
             .filter(h -> {

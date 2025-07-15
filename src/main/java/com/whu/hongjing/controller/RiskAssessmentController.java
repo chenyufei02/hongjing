@@ -9,7 +9,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
 
 @RestController
@@ -20,13 +19,14 @@ public class RiskAssessmentController {
     @Autowired
     private RiskAssessmentService riskAssessmentService;
 
+// ======== 【因为提供了模拟数据一键自动化生成的方法，此处未直接提供前端实现】 =========
     @Operation(summary = "新增一条客户风险评估记录")
     @PostMapping("/add")
-    // 2. 方法的参数，只接收分数的 DTO
     public RiskAssessment addAssessment(@RequestBody @Validated RiskAssessmentSubmitDTO dto) {
-        // 3. 调用 Service 层中的 createAssessment 方法根据分数dto计算风险等级并封装进RiskAssessment对象进行创建
+        // 调用 Service 层中的 createAssessment 方法根据分数dto计算风险等级并封装进RiskAssessment对象进行创建
         return riskAssessmentService.createAssessment(dto);
     }
+
 
     @Operation(summary = "根据客户ID查询其所有风险评估记录")
     @GetMapping("/customer/{customerId}")

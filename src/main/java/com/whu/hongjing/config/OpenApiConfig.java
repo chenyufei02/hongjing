@@ -12,22 +12,24 @@ import java.util.List;
 @Configuration
 public class OpenApiConfig {
 
+    // 对自动生成的文档进行全局配置 命名并留下联系方式等
+
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
-                .info(new Info()
-                        .title("泓镜客户管理系统 API")
-                        .version("1.0.0")
-                        .description("泓镜客户管理系统的REST API接口文档")
-                        .contact(new Contact()
-                                .name("开发团队")
-                                .email("chenqi02@whu.edu.cn")
-                        )
+            .info(new Info()
+                .title("泓镜客户管理系统 API")
+                .version("2.0.0")
+                .description("泓镜客户管理系统的REST API接口文档")
+                .contact(new Contact()
+                    .name("开发团队")
+                    .email("chenqi02@whu.edu.cn")
                 )
-                .servers(List.of(
-                        new Server()
-                                .url("http://localhost:8080")
-                                .description("本地开发环境")
-                ));
+            )
+            .servers(List.of(
+                new Server()
+                    .url("http://localhost:8080")
+                    .description("本地开发环境")
+            ));
     }
 }

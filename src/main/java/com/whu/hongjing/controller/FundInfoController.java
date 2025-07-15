@@ -1,14 +1,14 @@
 package com.whu.hongjing.controller;
 
-import com.whu.hongjing.pojo.dto.FundInfoDTO;
+//import com.whu.hongjing.pojo.dto.FundInfoDTO;
 import com.whu.hongjing.pojo.entity.FundInfo;
 import com.whu.hongjing.pojo.vo.ApiResponseVO;
 import com.whu.hongjing.service.FundInfoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.BeanUtils;
+//import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.validation.annotation.Validated;
+//import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import com.whu.hongjing.service.FundDataImportService;
 
@@ -34,22 +34,26 @@ public class FundInfoController {
 //    }
 //  【现实世界中似乎不应该有在自己的系统里手动增发一条基金的功能！】
 
-    // 【现实中似乎也不应该手动更新，应该全部来源于外部数据才对。 不应该提供手动更新的接口】
-    @Operation(summary = "更新基金信息")
-    @PutMapping("/update")
-    public boolean updateFundInfo(@RequestBody @Validated FundInfoDTO dto) {
-        FundInfo fundInfo = new FundInfo();
-        BeanUtils.copyProperties(dto, fundInfo);
-        return fundInfoService.updateById(fundInfo);
-    }
+// 【现实中似乎也不应该手动更新，应该全部来源于外部数据才对。 不应该提供手动更新的接口】
+//    @Operation(summary = "更新基金信息")
+//    @PutMapping("/update")
+//    public boolean updateFundInfo(@RequestBody @Validated FundInfoDTO dto) {
+//        FundInfo fundInfo = new FundInfo();
+//        BeanUtils.copyProperties(dto, fundInfo);
+//        return fundInfoService.updateById(fundInfo);
+//    }
+//
+//    // 【现实中不能手动删除 涉及到很多购买了的用户 因此也没有设计这个的前端实现】
+//    @Operation(summary = "根据基金代码删除基金信息")
+//    @DeleteMapping("/delete/{fundCode}")
+//    public boolean deleteFundInfo(@PathVariable String fundCode) {
+//        return fundInfoService.removeById(fundCode);
+//    }
 
-    // 【现实中似乎不能手动删除 涉及到很多购买了的用户 因此没有设计这个的前端接口】
-    @Operation(summary = "根据基金代码删除基金信息")
-    @DeleteMapping("/delete/{fundCode}")
-    public boolean deleteFundInfo(@PathVariable String fundCode) {
-        return fundInfoService.removeById(fundCode);
-    }
 
+
+
+    // 在pagecontroller里优化为了同时根据客户和基金代码综合查询的方法
     @Operation(summary = "根据基金代码查询基金信息")
     @GetMapping("/{fundCode}")
     public FundInfo getFundInfo(@PathVariable String fundCode) {
@@ -63,9 +67,10 @@ public class FundInfoController {
     }
 
 
+    // ！在前端页面：基金管理的页面的上方按钮调用
     @PostMapping("/import-all")
     @Operation(summary = "【手动触发】从外部数据源导入所有公募基金数据")
-    public ApiResponseVO importAllFunds() { // <-- 修改返回类型
+    public ApiResponseVO importAllFunds() {
         try {
             int count = fundDataImportService.importFundsFromDataSource();
             return new ApiResponseVO(true, "数据导入任务完成！共处理了 " + count + " 只基金。");
