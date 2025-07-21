@@ -12,9 +12,6 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import com.whu.hongjing.pojo.vo.CustomerTagVO;
-import com.whu.hongjing.service.CustomerTagService;
-import java.util.List;
 
 
 /**
@@ -30,8 +27,6 @@ public class CustomerController {
     @Autowired
     private CustomerService customerService;
 
-    @Autowired
-    private CustomerTagService customerTagService;
 
 // =========== 以下三个增删改在pagecontroller里显示列表页面后，在列表页面里点击相应的操作后由前端script绑定到这里的方法进行实现 =========
     /**
@@ -142,18 +137,9 @@ public class CustomerController {
 **/
 
 
-/**这里在pagecontroller的【详情页】里通过MP提供的list方式进行了实现，没有额外调用
+/**在pagecontroller的【详情页】里通过MP提供的list方式实现了根据各种tags查询客户，删除了原本在这里的不全的方法
 **/
-    /**
-     * 根据客户ID获取其画像标签的API。
-     * @param id 客户ID
-     * @return 标签列表
-     */
-    @Operation(summary = "根据客户ID获取其画像标签")
-    @GetMapping("/{id}/tags")
-    public List<CustomerTagVO> getCustomerTags(@PathVariable Long id) {
-        return customerTagService.getTagsByCustomerId(id);
-    }
+
 
 
 }
