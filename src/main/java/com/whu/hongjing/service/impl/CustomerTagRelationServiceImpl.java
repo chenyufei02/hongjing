@@ -1,12 +1,10 @@
 package com.whu.hongjing.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.whu.hongjing.mapper.CustomerTagRelationMapper;
 import com.whu.hongjing.pojo.entity.CustomerTagRelation;
-import com.whu.hongjing.service.CustomerService;
 import com.whu.hongjing.service.CustomerTagRelationService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.whu.hongjing.pojo.vo.TagVO;
 
@@ -60,7 +58,7 @@ public class CustomerTagRelationServiceImpl extends ServiceImpl<CustomerTagRelat
             return baseMapper.selectTagStats();
         }
 
-        // 3. 【核心修改】调用我们唯一的、标准的findCustomerIdsByTags方法
+        // 3. 调用findCustomerIdsByTags方法
         List<Long> customerIds = this.findCustomerIdsByTags(activeFilterTags);
 
         // 4. 如果没有客户符合所有筛选条件，返回空列表
@@ -73,7 +71,7 @@ public class CustomerTagRelationServiceImpl extends ServiceImpl<CustomerTagRelat
     }
 
 
-    // 【【【 3. 在这里，新增 findCustomerIdsByTags 方法的实现 】】】
+    // 【 新增 findCustomerIdsByTags 方法的实现 】
     public List<Long> findCustomerIdsByTags(List<String> tagNames) {
         if (tagNames == null || tagNames.isEmpty()) {
             return Collections.emptyList();

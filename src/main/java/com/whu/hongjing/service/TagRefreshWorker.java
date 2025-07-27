@@ -8,7 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -18,6 +17,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
+
 /**
  * 这是一个专门负责执行单个客户标签刷新事务的组件。
  * 将其独立出来，可以解决在异步线程中事务不生效的问题，并让职责更清晰。
@@ -25,7 +25,6 @@ import java.util.stream.Collectors;
 @Component
 public class TagRefreshWorker {
 
-    // 1. 把原来 TagRefreshServiceImpl 的所有依赖都复制到这里
     @Autowired private CustomerHoldingService customerHoldingService;
     @Autowired private FundTransactionService fundTransactionService;
     @Autowired private CustomerProfileService customerProfileService;
@@ -33,9 +32,9 @@ public class TagRefreshWorker {
     @Autowired private RiskAssessmentService riskAssessmentService;
 
     /**
-     * 这是我们新的、真正执行数据库操作的核心方法。
-     * 它必须是 public 且带有 @Transactional 注解，以便被外部调用并开启事务。
-     * 它接收已经查询好的 Customer 和 FundInfo 数据，专注于计算和写入。
+     * 执行数据库操作的核心方法。
+     * 必须是 public 且带有 @Transactional 注解，以便被外部调用并开启事务。
+     * 接收已经查询好的 Customer 和 FundInfo 数据，专注于计算和写入。
      * @param customer 待刷新画像的客户对象
      * @param fundInfoMap 全量的基金信息，用于提高性能
      */
@@ -62,7 +61,7 @@ public class TagRefreshWorker {
         }
     }
 
-    // --- 以下是所有从 TagRefreshServiceImpl 中“搬家”过来的私有辅助方法，代码和注释都保持原样 ---
+
 
     /**
      * 负责计算并保存一个客户的所有核心“量化”数据到 customer_profile 表。
@@ -121,7 +120,7 @@ public class TagRefreshWorker {
     }
 
     /**
-     * 【最终修正版】核心标签生成器：确保所有标签分类都严格使用常量
+     * 核心标签生成器：确保所有标签分类都严格使用常量
      */
     private List<CustomerTagRelation> generateAllTags(Customer customer, CustomerProfile profile, RiskAssessment assessment, List<FundTransaction> transactions, List<CustomerHolding> holdings, Map<String, FundInfo> fundInfoMap) {
         List<CustomerTagRelation> tags = new ArrayList<>();
@@ -260,6 +259,7 @@ public class TagRefreshWorker {
         return totalPurchase.subtract(totalRedeem);
     }
 
+    // 计算并判断定投行为的方法
     private boolean checkForRegularInvestment(List<FundTransaction> transactions) {
         Map<YearMonth, Boolean> monthlyPurchaseMap = transactions.stream()
             .filter(tx -> "申购".equals(tx.getTransactionType()) && tx.getTransactionTime().isAfter(LocalDateTime.now().minusYears(1)))

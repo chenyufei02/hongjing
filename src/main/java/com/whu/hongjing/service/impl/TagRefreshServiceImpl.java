@@ -18,15 +18,15 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 【最终版】客户画像刷新服务的调度中心。
- * 它的职责是准备数据和管理线程池，将具体的刷新任务分发给 TagRefreshWorker 执行。
+ * 客户画像刷新服务的调度中心
+ * 职责是准备数据和管理线程池，将具体的刷新任务分发给 TagRefreshWorker 执行。
  */
 @Service
 public class TagRefreshServiceImpl implements TagRefreshService {
 
     @Autowired private CustomerService customerService;
     @Autowired private FundInfoService fundInfoService;
-    @Autowired private TagRefreshWorker tagRefreshWorker; // 注入我们的“工人”
+    @Autowired private TagRefreshWorker tagRefreshWorker;
 
     /**
      * 【批量方法】刷新所有客户的画像数据（并行处理）。
@@ -53,7 +53,7 @@ public class TagRefreshServiceImpl implements TagRefreshService {
             for (final Customer customer : allCustomers) {
                 executor.submit(() -> {
                     try {
-                        // 4. 为每个客户调用“工人”的事务方法进行刷新
+                        // 4. 为每个客户调用定义好的事务方法进行刷新
                         tagRefreshWorker.refreshSingleCustomer(customer, fundInfoMap);
                     } catch (Exception e) {
                         System.err.println("【批量刷新错误】客户 " + customer.getId() + ": " + e.getMessage());
@@ -81,7 +81,7 @@ public class TagRefreshServiceImpl implements TagRefreshService {
 
     /**
      * 【核心方法】为单个客户刷新所有画像数据。
-     * 这是所有实时、单体更新的入口。它现在是一个包装器。
+     * 这是所有实时、单体更新的入口
      */
     @Override
     public void refreshTagsForCustomer(Long customerId) {
@@ -91,7 +91,7 @@ public class TagRefreshServiceImpl implements TagRefreshService {
         Map<String, FundInfo> fundInfoMap = fundInfoService.list().stream()
                 .collect(Collectors.toMap(FundInfo::getFundCode, Function.identity()));
 
-        // 2. 调用“工人”的方法执行刷新
+        // 2. 执行刷新
         tagRefreshWorker.refreshSingleCustomer(customer, fundInfoMap);
     }
 }

@@ -22,6 +22,7 @@ public final class TaggingConstants {
     // "短期交易型" 客户的 R 和 F 阈值
     public static final int RECENCY_ACTIVE_DAYS = 30;   // 近期活跃
     public static final int RECENCY_SLEEP_DAYS = 90;    // 近期沉睡
+
     public static final int FREQUENCY_HIGH_COUNT = 10;  // 高频交易
     public static final int FREQUENCY_LOW_COUNT = 2;    // 低频交易
 
