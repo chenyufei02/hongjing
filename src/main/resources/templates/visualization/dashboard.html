@@ -50,7 +50,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // --- 1. 获取所有需要操作的HTML元素 ---
-    const dashboardContainer = document.getElementById('dashboard-container');
+    const chartGridContainer = document.getElementById('chart-grid-container');
     const loadingIndicator = document.getElementById('loading-indicator');
     const filterFormContainer = document.getElementById('filter-form-container');
     const applyFiltersBtn = document.getElementById('apply-filters-btn');
@@ -65,11 +65,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- 2. 核心函数：根据数据绘制所有图表 ---
     function renderDashboard(statsData) {
-        dashboardContainer.innerHTML = '';
+        chartGridContainer.innerHTML = '';
         allChartInstances.forEach(chart => chart.destroy());
         allChartInstances = [];
         if (!statsData || Object.keys(statsData).every(key => !statsData[key] || statsData[key].length === 0)) {
-            dashboardContainer.innerHTML = '<div class="col-12 text-center py-5"><p class="text-muted">没有找到符合筛选条件的客户群体统计数据。</p></div>';
+            chartGridContainer.innerHTML = '<div class="col-12 text-center py-5"><p class="text-muted">没有找到符合筛选条件的客户群体统计数据。</p></div>';
             return;
         }
         for (const category in statsData) {
@@ -85,7 +85,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 cardBody.appendChild(canvas);
                 card.appendChild(cardBody);
                 chartWrapper.appendChild(card);
-                dashboardContainer.appendChild(chartWrapper);
+                chartGridContainer.appendChild(chartWrapper);
                 const config = getChartConfig(category, data);
                 allChartInstances.push(new Chart(canvas, config));
             }
@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function applyFilters(pageNum = 1, pageSize = 10) { // 默认每页10条
         loadingIndicator.style.display = 'block';
-        dashboardContainer.innerHTML = '';
+        chartGridContainer.innerHTML = '';
         customerListContainer.style.display = 'none';
 
         if (pageNum === 1) {

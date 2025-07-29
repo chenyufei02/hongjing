@@ -80,7 +80,7 @@ public class CustomerServiceImpl extends ServiceImpl<CustomerMapper, Customer> i
 
         if (StringUtils.hasText(tagName)) {
             // 单个多个tagName都要统一转换为列表，才好调用多标签查询方法
-            List<String> tagList = Arrays.asList(tagName.split(" "));
+            List<String> tagList = Arrays.asList(tagName.split(","));
             // 这里调用了外面根据tags查询客户ID的方法
             List<Long> customerIds = customerTagRelationService.findCustomerIdsByTags(tagList);
 

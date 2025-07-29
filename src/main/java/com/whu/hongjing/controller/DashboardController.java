@@ -33,8 +33,9 @@ public class DashboardController {
         List<TagVO> allTags = customerTagRelationService.getTagStats();
         Map<String, List<TagVO>> groupedTags = allTags.stream().collect(Collectors.groupingBy(TagVO::getTagCategory));
         List<String> categoryOrder = List.of(
-            TaggingConstants.CATEGORY_AGE, TaggingConstants.CATEGORY_GENDER, TaggingConstants.CATEGORY_OCCUPATION,
-            TaggingConstants.CATEGORY_STYLE, TaggingConstants.CATEGORY_ASSET, TaggingConstants.CATEGORY_RECENCY,
+            TaggingConstants.CATEGORY_AGE, TaggingConstants.CATEGORY_GENDER, TaggingConstants.CATEGORY_STYLE,
+            TaggingConstants.CATEGORY_OCCUPATION,
+            TaggingConstants.CATEGORY_ASSET, TaggingConstants.CATEGORY_RECENCY,
             TaggingConstants.CATEGORY_FREQUENCY, TaggingConstants.CATEGORY_RISK_DECLARED,
             TaggingConstants.CATEGORY_RISK_ACTUAL, TaggingConstants.CATEGORY_RISK_DIAGNOSIS
         );
@@ -58,14 +59,19 @@ public class DashboardController {
         result.setChartData(groupedChartData);
 
         // 2. 获取客户列表分页数据
-        Page<Customer> customerPage = getFilteredCustomerPage(filters, 1, 10);
+        // a. 从前端发送的 payload 中获取页码和每页大小
+        int pageNum = (int) payload.getOrDefault("page", 1);
+        int pageSize = (int) payload.getOrDefault("size", 10);
+
+        // b. 使用获取到的页码和大小进行查询
+        Page<Customer> customerPage = getFilteredCustomerPage(filters, pageNum, pageSize);
         result.setCustomerPage(customerPage);
 
         return result;
     }
 
     /**
-     * 【【【 专门用于客户列表分页查询 】】】
+     * 【 专门用于客户列表分页查询 】
      */
     @PostMapping("/filtered-customers")
     @Operation(summary = "【轻量级】根据筛选条件，仅获取客户列表的指定页")

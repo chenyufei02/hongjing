@@ -6,7 +6,6 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 mybatis-plus:
-#  mapper-locations: classpath*:/no-xml-mapper-path/**/*.xml
   mapper-locations: classpath:mapper/*.xml
   type-aliases-package: com.whu.hongjing.pojo.entity
   configuration:
@@ -14,7 +13,5 @@ mybatis-plus:
 
 logging:
   level:
-    # 将您项目中所有Mapper接口所在的包路径的日志级别设置为DEBUG
-    # 这样就可以看到SQL语句、参数和执行结果
     com.whu.hongjing.mapper: DEBUG
     root: INFO

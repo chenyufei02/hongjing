@@ -407,6 +407,12 @@ public class PageController {
 
 // =================================== 私有辅助方法 (Private Helper Methods) ===================================
 
+    /**
+     * 为投资分析图表准备数据
+     * @return void
+     * @author yufei
+     * @since 2025/7/29
+     */
     private void prepareChartData(Long customerId, Model model) {
         List<CustomerHolding> holdings = customerHoldingService.listByCustomerId(customerId);
         if (holdings == null || holdings.isEmpty()) {
@@ -475,33 +481,35 @@ public class PageController {
         }
 
         // --- 计算1：双曲线图（资产总额 vs 累计净投入） ---
-        Map<String, Map<String, BigDecimal>> historicalData = new LinkedHashMap<>();
-        BigDecimal cumulativeInvestment = BigDecimal.ZERO;
-        Map<String, BigDecimal> currentShares = new HashMap<>();
+        Map<String, Map<String, BigDecimal>> historicalData = new LinkedHashMap<>();  // 存放最后每一天的计算结果，string为date MAP存储每天的累计净投入与资产的entry（string标识”assets“或"investment"）
+
+        BigDecimal cumulativeInvestment = BigDecimal.ZERO;  // 初始化累计净投入值
+        Map<String, BigDecimal> currentShares = new HashMap<>();  // 存储所有基金的已有持有份额
 
         for (FundTransaction tx : transactions) {
             String date = tx.getTransactionTime().toLocalDate().toString();
             String fundCode = tx.getFundCode();
 
-            // 更新累计净投入 (现金流口径)
+            // 1： 更新累计净投入 (现金流口径)
             if ("申购".equals(tx.getTransactionType())) {
                 cumulativeInvestment = cumulativeInvestment.add(tx.getTransactionAmount());
             } else {
                 cumulativeInvestment = cumulativeInvestment.subtract(tx.getTransactionAmount());
             }
 
-            // 更新份额
-            BigDecimal shares = currentShares.getOrDefault(fundCode, BigDecimal.ZERO);
+            // 2： 更新资产总额-更新份额
+            BigDecimal shares = currentShares.getOrDefault(fundCode, BigDecimal.ZERO); // 获取当前基金的持有份额
             if ("申购".equals(tx.getTransactionType())) {
-                currentShares.put(fundCode, shares.add(tx.getTransactionShares()));
+                currentShares.put(fundCode, shares.add(tx.getTransactionShares()));   // 将交易的份额添加至当前基金的总持有份额
             } else {
                 currentShares.put(fundCode, shares.subtract(tx.getTransactionShares()));
             }
 
-            // 使用【所有】基金的【当前】份额 和 【当天】的成交价来估算总市值
+            // 2： 更新资产总额-更新总市值 ， 使用【所有】基金的【当前】份额 和 【当前这笔交易的】的成交价净值来估算总市值
+                // （因为没有存储每只基金每一天的数据表格，对其他当天未发生过交易的基金，其当天的数值无法确定，只能用一个模拟的估值）
             BigDecimal totalMarketValue = BigDecimal.ZERO;
             for(Map.Entry<String, BigDecimal> entry : currentShares.entrySet()) {
-                // 这里用当天交易的基金净值，去估算所有持仓的市值，是简化方案A的核心
+                // 这里用当天交易的基金净值，去估算所有持仓的市值，是简化方案的核心：对所有基金的持仓份额entry 都用当前交易的成交价净值tx.getSharePrice()相乘模拟市值波动
                 totalMarketValue = totalMarketValue.add(
                     entry.getValue().multiply(tx.getSharePrice() != null ? tx.getSharePrice() : BigDecimal.ONE)
                 );

@@ -29,14 +29,17 @@ public class ScheduledTasksService {
     @Autowired
     private CustomerHoldingService customerHoldingService;
 
-    // 【新增】注入我们新的事务写入服务
+    // 注入事务写入服务
     @Autowired
     private DailyUpdateWriterService dailyUpdateWriterService;
+    @Autowired
+    private TagRefreshService tagRefreshService;
 
     /**
+     * 【任务一】每日下午收盘后，更新基金净值与客户持仓市值。
      * 总调度方法，自身不带事务。负责协调两个并发的更新阶段。
      */
-    @Scheduled(cron = "0 09 17 * * ?")
+    @Scheduled(cron = "0 00 16 * * ?")
     public void updateNetValueAndMarketValueDaily() {
         System.out.println("【定时任务】开始执行每日净值与市值更新...");
 
@@ -48,7 +51,6 @@ public class ScheduledTasksService {
 
         System.out.println("【定时任务】每日净值与市值更新任务圆满完成！且已成功更新用户持仓表！");
     }
-
 
     /**
      * 阶段一：并发更新基金净值
@@ -64,10 +66,12 @@ public class ScheduledTasksService {
         List<FundInfo> updatedFunds = allFunds.parallelStream().map(fund -> {
             Random random = ThreadLocalRandom.current();
             BigDecimal currentNetValue = fund.getNetValue();
+            // 如果为空则初始化随机值
             if (currentNetValue == null || currentNetValue.compareTo(BigDecimal.ZERO) == 0) {
                 currentNetValue = BigDecimal.valueOf(0.8 + random.nextDouble() * 0.7);
             }
-            double percentageChange = (random.nextDouble() * 0.05) - 0.025;
+            // 不为空则在一定范围内按比例波动
+            double percentageChange = (random.nextDouble() * 0.05) - 0.025;  // 波动幅度为±0.025
             BigDecimal newNetValue = currentNetValue.multiply(BigDecimal.valueOf(1 + percentageChange))
                     .setScale(4, RoundingMode.HALF_UP);
 
@@ -171,5 +175,25 @@ public class ScheduledTasksService {
             if (!writerExecutor.isTerminated()) writerExecutor.shutdownNow();
         }
     }
+
+
+
+    /**
+     * 【任务二】每日凌晨，批量刷新所有客户的画像标签。
+     * 这是一个计算和IO密集型任务，安排在系统负载最低的凌晨执行。
+     */
+    @Scheduled(cron = "0 0 2 * * ?") // 每天 02:00 执行
+    public void refreshAllCustomerTagsDaily() {
+        System.out.println("【定时任务】开始执行每日全量客户画像刷新...");
+        try {
+            // 直接调用已经写好的并发刷新服务
+            tagRefreshService.refreshAllTagsAtomically();
+            System.out.println("【定时任务】每日全量客户画像刷新任务圆满完成！");
+        } catch (Exception e) {
+            System.err.println("【定时任务】在执行每日全量客户画像刷新时发生严重错误！");
+            e.printStackTrace();
+        }
+    }
+
 
  }

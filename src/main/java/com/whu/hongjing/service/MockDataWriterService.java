@@ -66,8 +66,8 @@ public class MockDataWriterService {
      */
     @Transactional(isolation = Isolation.READ_COMMITTED)
     @Retryable(
-        value = { DeadlockLoserDataAccessException.class },
-        maxAttempts = 3,
+        value = { DeadlockLoserDataAccessException.class },    // 发生死锁时才重试
+        maxAttempts = 3,   // 最大重试次数
         backoff = @Backoff(delay = 50, multiplier = 2)
     )
     public void saveNewCustomerInTransaction(Customer customer) {
@@ -78,7 +78,7 @@ public class MockDataWriterService {
         // 2. 使用回填了ID的customer对象，创建并保存其风险评估。
         RiskAssessmentSubmitDTO assessmentDto = new RiskAssessmentSubmitDTO();
         assessmentDto.setCustomerId(customer.getId()); // 此处可以获取到ID
-        assessmentDto.setScore(ThreadLocalRandom.current().nextInt(101));
+        assessmentDto.setScore(ThreadLocalRandom.current().nextInt(101));  // 随机模拟生成风险评估分数
         assessmentDto.setAssessmentDate(LocalDate.now().minusDays(ThreadLocalRandom.current().nextInt(365)));
         riskAssessmentService.createAssessment(assessmentDto);
     }

@@ -10,7 +10,6 @@ import com.whu.hongjing.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -52,7 +51,7 @@ public class MockDataServiceImpl implements MockDataService {
         int corePoolSize = Runtime.getRuntime().availableProcessors();
         ThreadFactory calcThreadFactory = new ThreadFactoryBuilder().setNameFormat("customer-creator-thread-%d").build();
         ExecutorService calcExecutor = new ThreadPoolExecutor(
-            corePoolSize,
+            corePoolSize+1,   // CPU核数16 计算密集型
             corePoolSize * 10,
             60L,
             TimeUnit.SECONDS,
@@ -81,6 +80,7 @@ public class MockDataServiceImpl implements MockDataService {
                 customer.setAddress(address);
                 return customer;
             };
+            // 不断给线程池提交任务，并立即返回Future<Customer>对象，add进列表，然后task慢慢执行，真正返回customer后先被保存到Future里包装 存在列表里
             calcFutures.add(calcExecutor.submit(task));
         }
         calcExecutor.shutdown();
@@ -88,34 +88,34 @@ public class MockDataServiceImpl implements MockDataService {
         // --- 第二阶段：并发写入 ---
         ThreadFactory writerThreadFactory = new ThreadFactoryBuilder().setNameFormat("customer-writer-thread-%d").build();
         ExecutorService writerExecutor = new ThreadPoolExecutor(
-            corePoolSize,
-                corePoolSize * 10,
-                60L,
-                TimeUnit.SECONDS,
-                new LinkedBlockingQueue<>(customerCount),
-                writerThreadFactory,
-                new ThreadPoolExecutor.CallerRunsPolicy()
+            corePoolSize *2,  // CPU核数16  IO密集型
+            corePoolSize * 10,
+            60L,
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(customerCount),
+            writerThreadFactory,
+            new ThreadPoolExecutor.CallerRunsPolicy()
         );
 
-        List<Future<Void>> writerFutures = new ArrayList<>();
+        List<Future<Void>> writerFutures = new ArrayList<>(); // 用来装载所有任务的future结果，用于最后统计一共成功完成了多少个客户的生成
 
         try {
             System.out.println("【创世】等待计算任务完成，并向写入线程池提交独立的并发写入任务...");
             for (Future<Customer> future : calcFutures) {
                 // a. 获取一个在内存中预先计算好的Customer对象
-                // 注意：由于闭包的限制，我们需要一个final或有效final的引用
+                // 【核心】  future.get方法保证顺序性，在此调用get时如果碰到Future里的<Customer>还没有计算完成，就会在此阻塞等待其完成，而不会直接拿着Future进入后续流程。
                 final Customer initialCustomer = future.get();
 
-                // b. 为这个Customer对象创建一个独立的、可自我修复的写入任务
+                // b. 为这个Customer对象创建一个独立的、可自我修复的写入任务【即设置任务重试来防止生成的对象和之前的有手机号、id号冲突而写入数据库失败等】
                 Callable<Void> writeTask = () -> {
-                    int maxRetries = 5; // 为防止极端情况，设置最大重试次数
+                    int maxRetries = 5; // 设置最大重试次数
                     Customer currentCustomer = initialCustomer; // 将初始客户作为第一次尝试的对象
 
                     for (int i = 0; i < maxRetries; i++) {
                         try {
                             // 尝试写入当前客户的数据 【同时在这里自动生成和写入当前客户的风险评估数据！！！】
                             mockDataWriterService.saveNewCustomerInTransaction(currentCustomer);
-                            // 如果成功，立刻跳出重试循环
+                            // 如果成功，立刻跳出当前客户的重试循环
                             return null;
                         } catch (DuplicateKeyException e) {
                             // 【核心修复】如果捕获到的是唯一键冲突异常
@@ -155,7 +155,7 @@ public class MockDataServiceImpl implements MockDataService {
             if (!calcExecutor.isTerminated()) calcExecutor.shutdownNow();
         }
 
-        // --- 第三阶段：检查所有并发写入任务的结果 ---
+        // --- 第三阶段：统计所有并发写入任务的结果 ---
         writerExecutor.shutdown();
         int successCount = 0;
         try {
@@ -178,7 +178,7 @@ public class MockDataServiceImpl implements MockDataService {
 
 
     /**
-     * 总调度方法，自身不带事务。负责协调“并发计算”和“事务性写入”两个阶段。
+     * 模拟计算和保存交易数据的总调度方法，自身不带事务。负责协调“并发计算”和“事务性写入”两个阶段。
      */
     @Override
     public String simulateTradingDays(int days) {
@@ -199,8 +199,8 @@ public class MockDataServiceImpl implements MockDataService {
         int corePoolSize = Runtime.getRuntime().availableProcessors();
         ThreadFactory calcThreadFactory = new ThreadFactoryBuilder().setNameFormat("mock-data-thread-%d").build();
         ExecutorService calcExecutor = new ThreadPoolExecutor(
-            corePoolSize,
-            corePoolSize * 5,
+            corePoolSize + 1,  // cpu核数16 计算密集型
+            corePoolSize * 10,
             1200L,
             TimeUnit.SECONDS,
             new LinkedBlockingQueue<>(20480),
@@ -209,7 +209,7 @@ public class MockDataServiceImpl implements MockDataService {
         );
 
         List<Future<Map<String, Object>>> futures = new ArrayList<>();  // 用来保存所有的更新后的持仓表和交易表
-        System.out.println("【演绎-步骤1】向 " + corePoolSize*6 + " 个线程提交 " + allCustomers.size() + " 个客户的并行模拟任务...");
+        System.out.println("【演绎-步骤1】向 " + corePoolSize*10 + " 个线程提交 " + allCustomers.size() + " 个客户的并行模拟任务...");
 
         for (Customer customer : allCustomers) {
             // 为每一个客户定义了一个返回其所有天数更新后的最新的Map 里面是其更新后的持仓表与交易表
@@ -291,16 +291,17 @@ public class MockDataServiceImpl implements MockDataService {
                      customerHoldings.put(targetFund.getFundCode(), holding);
                         // （交易数据已经在申购和赎回方法内部提前添加到了当前用户的交易数据表）
 
-                } // 到这里一天循环执行完毕
+                } // 到这里单个客户一年内的交易行为模拟循环执行完毕
 
+                // 将当前客户的交易数据保存到结果
                 Map<String, Object> result = new HashMap<>();
-                result.put("customerId", customer.getId()); // 把customerId也放进结果
-                result.put("transactions", customerTransactions);  // 当前用户所有天更新后的交易表
-                result.put("holdings", new ArrayList<>(customerHoldings.values())); // 当前用户所有天更新过的持仓表
+                result.put("customerId", customer.getId()); // 把customerId放进结果
+                result.put("transactions", customerTransactions);  // 当前用户所有天更新后的交易表放进结果
+                result.put("holdings", new ArrayList<>(customerHoldings.values())); // 当前用户所有天更新过的持仓表放进结果
                 return result;  // 当前用户的交易表和持仓表一起打包返回结果 这里一个result就是一个客户所有天更新后的全部数据
             };
-            futures.add(calcExecutor.submit(task));  // 返回的是一个Future<Map<String, Object>>对象，也就是一个客户的更新后的数据，添加到总futures表格里
-            // 此时针对当前用户的所有天的更新任务执行完毕， 等所有用户的任务都执行完毕以后线程并发也结束了，下面娥保存数据完全依靠单线程SaveBatch
+            futures.add(calcExecutor.submit(task));  // 返回的是一个Future<Map<String, Object>>对象，也就是一个客户的更新后的result数据，添加到总futures列表里
+            // 等所有用户的任务都执行完毕以后线程并发也结束了
         }
         calcExecutor.shutdown();
 
@@ -310,8 +311,8 @@ public class MockDataServiceImpl implements MockDataService {
         List<Future<Void>> writerFutures = new ArrayList<>();
         ThreadFactory writerThreadFactory = new ThreadFactoryBuilder().setNameFormat("mock-writer-thread-%d").build();
         ExecutorService writerExecutor = new ThreadPoolExecutor(
-            corePoolSize,
-            corePoolSize * 5,
+            corePoolSize *2 ,  // CPU核数16 IO密集型
+            corePoolSize * 10,
             1200L,
             TimeUnit.SECONDS,
             new LinkedBlockingQueue<>(20480),

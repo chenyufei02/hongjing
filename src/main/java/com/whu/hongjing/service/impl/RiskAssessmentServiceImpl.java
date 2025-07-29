@@ -34,7 +34,7 @@ public class RiskAssessmentServiceImpl extends ServiceImpl<RiskAssessmentMapper,
 
     @Override
     public RiskAssessment createAssessment(RiskAssessmentSubmitDTO dto) {
-        // 2. 使用我们的枚举类，根据分数计算出风险等级
+        // 2. 使用枚举类，根据分数计算出风险等级
         RiskLevelEnum riskLevelEnum = RiskLevelEnum.getByScore(dto.getScore());
 
         // 3. 创建一个完整的、即将存入数据库的实体对象
@@ -76,7 +76,7 @@ public class RiskAssessmentServiceImpl extends ServiceImpl<RiskAssessmentMapper,
                 tagFilters.add(riskDiagnosis);
             }
 
-            // 2. 调用我们唯一的、标准的、接收List的方法
+            // 2. 调用接收List的方法
             customerIdsToFilter = new HashSet<>(customerTagRelationService.findCustomerIdsByTags(tagFilters));
 
             if (customerIdsToFilter.isEmpty()) {
@@ -118,7 +118,7 @@ public class RiskAssessmentServiceImpl extends ServiceImpl<RiskAssessmentMapper,
             assessmentQueryWrapper.eq("risk_level", riskLevel);
         }
 
-        // c. 【【【 关键修复：恢复动态排序逻辑 】】】
+        // c. 【 动态排序逻辑 】
         if (StringUtils.hasText(sortField)) {
             String dbColumn;
             switch (sortField) {

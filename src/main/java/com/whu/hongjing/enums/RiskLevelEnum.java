@@ -12,7 +12,7 @@ public enum RiskLevelEnum {
     // 定义所有的风险等级实例
     CONSERVATIVE("申报-保守型", 0, 10*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_STEADY),
     STEADY("申报-稳健型", 10*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_STEADY, 10*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_BALANCED),
-    BALANCED("申报-平衡型", 10*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_BALANCED, 10*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_GROWTH), // 我们可以增加一个“平衡型”来让划分更精细
+    BALANCED("申报-平衡型", 10*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_BALANCED, 10*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_GROWTH),
     GROWTH("申报-成长型", 10*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_GROWTH, 10*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_AGGRESSIVE),
     AGGRESSIVE("申报-激进型", 10*(int)TaggingConstants.ACTUAL_RISK_THRESHOLD_AGGRESSIVE, 100);
 

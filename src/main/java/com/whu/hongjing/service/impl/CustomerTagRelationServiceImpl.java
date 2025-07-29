@@ -1,22 +1,19 @@
 package com.whu.hongjing.service.impl;
 
-
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.whu.hongjing.mapper.CustomerTagRelationMapper;
 import com.whu.hongjing.pojo.entity.CustomerTagRelation;
 import com.whu.hongjing.service.CustomerTagRelationService;
 import org.springframework.stereotype.Service;
 import com.whu.hongjing.pojo.vo.TagVO;
-
 import java.util.*;
 import java.util.stream.Collectors;
-
 import com.whu.hongjing.constants.TaggingConstants;
 import org.springframework.util.StringUtils;
 
+
 @Service
 public class CustomerTagRelationServiceImpl extends ServiceImpl<CustomerTagRelationMapper, CustomerTagRelation> implements CustomerTagRelationService {
-
 
     @Override
     public List<TagVO> getTagStats() {
@@ -71,12 +68,12 @@ public class CustomerTagRelationServiceImpl extends ServiceImpl<CustomerTagRelat
     }
 
 
-    // 【 新增 findCustomerIdsByTags 方法的实现 】
+    // 【  findCustomerIdsByTags 方法的实现 】
     public List<Long> findCustomerIdsByTags(List<String> tagNames) {
         if (tagNames == null || tagNames.isEmpty()) {
             return Collections.emptyList();
         }
-        // 直接调用本类的Mapper方法
+        // 直接调用本类的Mapper方法 【在SQL语句里判断了只有同时拥有 tagName.size个标签的结果会被返回 因为是同时选择了这么多个标签在进行筛选】
         return baseMapper.findCustomerIdsByTags(tagNames, tagNames.size());
     }
 }

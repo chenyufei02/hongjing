@@ -84,7 +84,7 @@ public class TagRefreshServiceImpl implements TagRefreshService {
      * 这是所有实时、单体更新的入口
      */
     @Override
-    public void refreshTagsForCustomer(Long customerId) {
+    public void  refreshTagsForCustomer(Long customerId) {
         // 1. 准备数据
         Customer customer = customerService.getById(customerId);
         if (customer == null) return;

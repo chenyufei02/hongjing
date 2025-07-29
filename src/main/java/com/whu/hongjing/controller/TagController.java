@@ -16,7 +16,6 @@ public class TagController {
     @Autowired
     private TagRefreshService tagRefreshService;
 
-    // 【未提供单独刷新一个的前端实现】
     @PostMapping("/refresh/{customerId}")
     @Operation(summary = "【手动触发】刷新指定客户的所有标签")
     public ApiResponseVO refreshCustomerTags(@PathVariable Long customerId) { // <-- 2. 修改返回类型为 ApiResponseVO

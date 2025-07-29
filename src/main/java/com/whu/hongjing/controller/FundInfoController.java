@@ -51,8 +51,6 @@ public class FundInfoController {
 //    }
 
 
-
-
     // 在pagecontroller里优化为了同时根据客户和基金代码综合查询的方法
     @Operation(summary = "根据基金代码查询基金信息")
     @GetMapping("/{fundCode}")

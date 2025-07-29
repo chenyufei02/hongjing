@@ -82,9 +82,11 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
         // 4. 根据申购金额和净值，计算出客户能购买到的份额
         BigDecimal shares = dto.getTransactionAmount().divide(sharePrice, 2, RoundingMode.DOWN);
         transaction.setTransactionShares(shares);
+        // ------ 到此交易表保存完毕 ------
 
         // 5. 保存交易并触发持仓更新
         return saveTransactionAndUpdateHolding(transaction);
+        // ------ 到此持仓表保存完毕 ------
     }
 
     /**
@@ -111,11 +113,11 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
             );
         }
 
-        // 2. 从我们自己的数据库中，获取该基金最新的、可靠的净值
+        // 2. 从数据库中，获取该基金最新的、可靠的净值
         FundInfo fundInfo = fundInfoService.getById(dto.getFundCode());
         Assert.notNull(fundInfo, "找不到对应的基金信息：" + dto.getFundCode());
         Assert.notNull(fundInfo.getNetValue(), "该基金暂无有效的净值信息，无法交易。");
-        BigDecimal sharePrice = fundInfo.getNetValue();
+        BigDecimal sharePrice = fundInfo.getNetValue();   // 采用模拟的按前一天收盘的净值赎回
 
         // 3. 创建交易实体
         FundTransaction transaction = new FundTransaction();
