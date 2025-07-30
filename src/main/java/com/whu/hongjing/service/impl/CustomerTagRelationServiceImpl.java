@@ -20,7 +20,7 @@ public class CustomerTagRelationServiceImpl extends ServiceImpl<CustomerTagRelat
         // 步骤1：从数据库获取未排序的统计数据
         List<TagVO> unsortedTags = baseMapper.selectTagStats();
 
-        // 步骤2：定义我们期望的“黄金排序规则”
+        // 步骤2：定义期望的排序规则
         List<String> categoryOrder = List.of(
             TaggingConstants.CATEGORY_AGE,
             TaggingConstants.CATEGORY_GENDER,

@@ -53,7 +53,7 @@ public class FundTransactionServiceImpl extends ServiceImpl<FundTransactionMappe
     private CustomerHoldingService customerHoldingService;
 
     /**
-     * 处理基金申购业务
+     * 在一个事务内处理基金申购业务 和 更新客户持仓数据
      * @param dto 包含申购信息的DTO对象
      * @return 创建并保存好的交易记录实体
      */

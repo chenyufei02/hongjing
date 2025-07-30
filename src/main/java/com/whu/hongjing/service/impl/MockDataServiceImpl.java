@@ -113,8 +113,10 @@ public class MockDataServiceImpl implements MockDataService {
 
                     for (int i = 0; i < maxRetries; i++) {
                         try {
-                            // 尝试写入当前客户的数据 【同时在这里自动生成和写入当前客户的风险评估数据！！！】
+
+                            // 尝试写入当前客户的数据 【同时在这里自动生成和写入当前客户的风险评估数据！！！！！！！！！！！！！！！！】
                             mockDataWriterService.saveNewCustomerInTransaction(currentCustomer);
+
                             // 如果成功，立刻跳出当前客户的重试循环
                             return null;
                         } catch (DuplicateKeyException e) {

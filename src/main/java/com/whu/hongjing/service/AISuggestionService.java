@@ -9,7 +9,7 @@ import java.util.Map;
 public interface AISuggestionService {
 
     /**
-     * 【V2版】为指定客户生成营销建议
+     * 为指定客户生成营销建议
      * @param profitLossVO 客户的盈亏统计
      * @param tags 客户的所有标签
      * @param assetAllocationData 资产类别分布图数据

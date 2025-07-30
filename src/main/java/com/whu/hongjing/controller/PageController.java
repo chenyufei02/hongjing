@@ -408,35 +408,48 @@ public class PageController {
 // =================================== 私有辅助方法 (Private Helper Methods) ===================================
 
     /**
-     * 为投资分析图表准备数据
+     * 为客户详情页准备所有图表所需的数据，并将其添加到Spring MVC的Model中。
      * @return void
      * @author yufei
      * @since 2025/7/29
      */
     private void prepareChartData(Long customerId, Model model) {
+        // 1. 获取客户当前的所有持仓记录。
         List<CustomerHolding> holdings = customerHoldingService.listByCustomerId(customerId);
+        // 如果客户没有任何持仓，则设置空图表数据并直接返回，避免后续计算。
         if (holdings == null || holdings.isEmpty()) {
             setEmptyChartData(model);
             return;
         }
 
+        // 2. 计算客户的总资产市值（M）。
         BigDecimal totalMarketValue = holdings.stream().map(CustomerHolding::getMarketValue).filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        // 如果总市值为0或负数，同样视为无效数据，直接返回。
         if (totalMarketValue.compareTo(BigDecimal.ZERO) <= 0) {
             setEmptyChartData(model);
             return;
         }
 
+        // 3. 准备关联数据，用于后续高效计算。
+        // a. 提取所有持仓中不重复的基金代码。
         List<String> fundCodes = holdings.stream().map(CustomerHolding::getFundCode).distinct().collect(Collectors.toList());
+        // b. 一次性从数据库中查询出所有相关的基金信息，并存入Map，避免在循环中重复查询（N+1问题）。
         Map<String, FundInfo> fundInfoMap = fundInfoService.listByIds(fundCodes).stream().collect(Collectors.toMap(FundInfo::getFundCode, Function.identity()));
 
+        // 4. 计算“资产类别分布图”所需的数据。
+        // 按基金类型(fundType)对持仓进行分组，并对每个分组的市值(marketValue)进行求和。
         Map<String, BigDecimal> assetAllocationData = holdings.stream()
                 .filter(h -> fundInfoMap.get(h.getFundCode()) != null && h.getMarketValue() != null && fundInfoMap.get(h.getFundCode()).getFundType() != null)
-                .collect(Collectors.groupingBy(h -> fundInfoMap.get(h.getFundCode()).getFundType(),
-                        Collectors.reducing(BigDecimal.ZERO, CustomerHolding::getMarketValue, BigDecimal::add)));
-
+                .collect(Collectors.groupingBy(
+                    // 分组依据：从fundInfoMap中获取基金类型
+                    h -> fundInfoMap.get(h.getFundCode()).getFundType(),
+                    // 聚合操作：对组内元素的marketValue求和
+                    Collectors.reducing(BigDecimal.ZERO, CustomerHolding::getMarketValue, BigDecimal::add)));
+        // 5. 计算“多维风险洞察雷达图”所需的数据。
+        // 调用一个独立的辅助方法来封装更复杂的风险指标计算逻辑。
         Map<String, BigDecimal> riskInsightData = calculateRiskInsightData(customerId, holdings, fundInfoMap, totalMarketValue);
 
-        // b. 【【【 新增：为图表定义统一的颜色映射 】】】
+        // 为图表定义统一的颜色映射
         Map<String, String> colorMap = new LinkedHashMap<>();
         colorMap.put("股票型", "#FF6384");
         colorMap.put("指数型", "#FF9F40");
@@ -561,23 +574,22 @@ public class PageController {
         BigDecimal topHoldingValue = holdings.stream().map(CustomerHolding::getMarketValue).filter(Objects::nonNull).max(Comparator.naturalOrder()).orElse(BigDecimal.ZERO);
         BigDecimal allInvestableValue = highRiskValue.add(midHighRiskValue).add(filterAndSum(holdings, fundInfoMap, List.of("债券型")));
 
-        // --- 核心逻辑改造 ---
+        // --- 核心逻辑 ---
         Map<String, BigDecimal> riskInsightData = new LinkedHashMap<>();
         BigDecimal hundred = new BigDecimal(100);
 
-        // 维度1：风险暴露度 (不变)
+        // 维度1：风险暴露度
         riskInsightData.put("风险暴露度", highRiskValue.add(midHighRiskValue).divide(totalMarketValue, 4, RoundingMode.HALF_UP).multiply(hundred));
-        // 维度2：投资进攻性 (不变)
+        // 维度2：投资进攻性
         riskInsightData.put("投资进攻性", allInvestableValue.compareTo(BigDecimal.ZERO) > 0 ? highRiskValue.divide(allInvestableValue, 4, RoundingMode.HALF_UP).multiply(hundred) : BigDecimal.ZERO);
-        // 维度3：持仓集中度 (不变)
+        // 维度3：持仓集中度
         riskInsightData.put("持仓集中度", topHoldingValue.divide(totalMarketValue, 4, RoundingMode.HALF_UP).multiply(hundred));
 
-        // 维度4：【【【 改造为“知行不匹配度” 】】】
-        // 首先获取诊断标签，然后转换为“不匹配”分数 (0, 40, 80)
+        // 维度4：“知行不匹配度”
         String diagnosisTag = customerTagRelationService.list(new QueryWrapper<CustomerTagRelation>().eq("customer_id", customerId).eq("tag_category", TaggingConstants.CATEGORY_RISK_DIAGNOSIS))
                 .stream().map(CustomerTagRelation::getTagName).findFirst().orElse("");
         riskInsightData.put("行为激进程度", calculateAggressivenessScore(diagnosisTag));
-        // 维度5：【【【 改造为“流动性风险” 】】】
+        // 维度5：“流动性风险”
         // 计算(100 - 流动性储备百分比)
         BigDecimal liquidityReserve = lowRiskValue.divide(totalMarketValue, 4, RoundingMode.HALF_UP).multiply(hundred);
         riskInsightData.put("流动性风险", hundred.subtract(liquidityReserve));

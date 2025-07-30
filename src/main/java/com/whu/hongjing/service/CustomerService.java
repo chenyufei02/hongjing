@@ -26,7 +26,7 @@ public interface CustomerService extends IService<Customer>{
 
 
 
-    // --- 【【【 新增方法声明 】】】 ---
+
     /**
      * 根据客户ID，获取该客户的盈亏统计信息
      * @param customerId 客户ID

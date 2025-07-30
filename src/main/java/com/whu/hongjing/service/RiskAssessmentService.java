@@ -17,7 +17,7 @@ public interface RiskAssessmentService extends IService<RiskAssessment> {
     RiskAssessment createAssessment(RiskAssessmentSubmitDTO dto);
 
    /**
-     * 【修改】根据条件分页查询风险评估记录, 增加排序功能
+     * 根据条件分页查询风险评估记录, 增加排序功能
      * @param page 分页对象
      * @param customerName 客户姓名 (模糊查询)
      * @param riskLevel 风险等级 (精确查询)

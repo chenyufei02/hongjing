@@ -25,8 +25,7 @@
             </div>
             <div class="card-body">
                 <p class="card-text text-muted">请在下方不同类别中选择一个或多个标签，然后点击“查询匹配的客户”按钮，系统将找出同时拥有您所选全部标签的客户群体。</p>
-                <div id="combo-query-form" class="row g-3">
-                    </div>
+                <div id="combo-query-form" class="row g-3"></div>
                 <hr>
                 <div class="d-flex justify-content-end align-items-center">
                      <button id="reset-query-btn" class="btn btn-outline-secondary me-2">重置选择</button>
@@ -107,10 +106,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 formContainer.appendChild(col);
             }
         }
-        resetBtn.addEventListener('click', function() { /* ... */ });
-        submitBtn.addEventListener('click', function() { /* ... */ });
 
-        // --- 【【【 全新升级的“一键刷新”逻辑 】】】 ---
+        // 为“重置选择”按钮添加逻辑
+        resetBtn.addEventListener('click', function() {
+            document.querySelectorAll('.combo-select').forEach(select => {
+                select.value = '';
+            });
+        });
+
+        // 为“查询匹配的客户”按钮补全逻辑
+        submitBtn.addEventListener('click', function() {
+            // 1. 收集所有下拉框中被选中的、非空的标签值
+            const selectedTags = [];
+            document.querySelectorAll('.combo-select').forEach(select => {
+                if (select.value) {
+                    selectedTags.push(select.value);
+                }
+            });
+
+            // 如果没有选择任何标签，则不执行任何操作
+            if (selectedTags.length === 0) {
+                alert('请至少选择一个标签进行查询。');
+                return;
+            }
+
+            // 2. 将标签列表用【逗号】拼接成一个字符串
+            //    注意：这里的分隔符必须和 CustomerServiceImpl 中 .split() 使用的分隔符一致！
+            const tagNameQuery = selectedTags.join(',');
+
+            // 3. 构建最终的URL并跳转到客户列表页
+            const targetUrl = `/customer/list?tagName=${encodeURIComponent(tagNameQuery)}`;
+            window.location.href = targetUrl;
+        });
+
+        // --- 【 一键刷新 】 ---
         const refreshBtn = document.getElementById('refresh-all-tags-btn');
         const toastElement = document.getElementById('liveToast');
         const toast = new bootstrap.Toast(toastElement);

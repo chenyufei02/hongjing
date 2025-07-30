@@ -7,7 +7,7 @@ import com.whu.hongjing.pojo.entity.FundInfo;
 public interface FundInfoService extends IService<FundInfo> {
 
     /**
-     * 【新增】根据条件分页查询基金信息
+     * 根据条件分页查询基金信息
      * @param page 分页对象
      * @param fundCode 基金代码（模糊查询）
      * @param fundName 基金名称（模糊查询）

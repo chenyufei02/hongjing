@@ -5,12 +5,11 @@ import com.whu.hongjing.pojo.entity.CustomerTagRelation;
 import com.whu.hongjing.pojo.vo.TagVO;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public interface CustomerTagRelationService extends IService<CustomerTagRelation> {
 
     /**
-     * 【新增】统计每个标签的客户数量
+     * 统计每个标签的客户数量
      * @return 包含标签名和客户数的VO列表
      */
     List<TagVO> getTagStats();
